@@ -29,3 +29,5 @@ anyhow = "1.0.103"
 reqwest = { version = "0.12", default-features = false, features = ["stream", "rustls-tls", "http2", "charset", "json"] }
 futures-util = "0.3"
 whisper-rs = { version = "0.16", features = ["metal"] }
+arboard = "3"
+enigo = "0.6"

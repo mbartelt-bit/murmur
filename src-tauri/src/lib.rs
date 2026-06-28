@@ -1,5 +1,6 @@
 mod audio;
 mod cleanup;
+mod insert;
 mod model;
 mod permissions;
 mod resample;
