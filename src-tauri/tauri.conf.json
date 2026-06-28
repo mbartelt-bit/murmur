@@ -1,0 +1,24 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Murmur",
+  "version": "0.1.0",
+  "identifier": "com.murmur.app",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "withGlobalTauri": false,
+    "windows": [
+      { "label": "settings", "title": "Murmur", "width": 760, "height": 560, "visible": false, "resizable": true },
+      { "label": "hud", "url": "hud.html", "width": 260, "height": 72, "x": 40, "y": 40,
+        "transparent": true, "decorations": false, "alwaysOnTop": true,
+        "skipTaskbar": true, "shadow": false, "focus": false, "resizable": false, "visible": false }
+    ],
+    "security": { "csp": null }
+  },
+  "bundle": { "active": true, "targets": "app", "icon": ["icons/icon.icns", "icons/icon.png"] }
+}

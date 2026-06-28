@@ -1,0 +1,44 @@
+mod windows;
+
+use tauri::{
+    menu::{Menu, MenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    Manager,
+};
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        .setup(|app| {
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
+            let quit = MenuItem::with_id(app, "quit", "Quit Murmur", true, None::<&str>)?;
+            let settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&settings, &quit])?;
+
+            TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .menu(&menu)
+                .show_menu_on_left_click(false)
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "quit" => app.exit(0),
+                    "settings" => windows::show_settings(app),
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        windows::show_settings(tray.app_handle());
+                    }
+                })
+                .build(app)?;
+            Ok(())
+        })
+        .run(tauri::generate_context!())
+        .expect("error while running Murmur");
+}
