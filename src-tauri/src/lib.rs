@@ -5,10 +5,33 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Manager,
 };
+use tauri_plugin_sql::{Builder as SqlBuilder, Migration, MigrationKind};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let migrations = vec![Migration {
+        version: 1,
+        description: "create_core_tables",
+        sql: "
+            CREATE TABLE transcripts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                raw_text TEXT NOT NULL,
+                clean_text TEXT NOT NULL,
+                app_name TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE dictionary (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                term TEXT NOT NULL UNIQUE,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+        ",
+        kind: MigrationKind::Up,
+    }];
+
     tauri::Builder::default()
+        .plugin(SqlBuilder::default().add_migrations("sqlite:murmur.db", migrations).build())
+        .plugin(tauri_plugin_store::Builder::new().build())
         .setup(|app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);

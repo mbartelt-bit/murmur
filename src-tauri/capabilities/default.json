@@ -5,6 +5,11 @@
   "windows": ["settings", "hud"],
   "permissions": [
     "core:default",
-    "opener:default"
+    "opener:default",
+    "sql:default",
+    "sql:allow-execute",
+    "sql:allow-select",
+    "sql:allow-load",
+    "store:default"
   ]
 }
