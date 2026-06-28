@@ -4,6 +4,7 @@ mod hotkey;
 mod insert;
 mod model;
 mod permissions;
+mod pipeline;
 mod resample;
 mod secrets;
 mod stt;
@@ -69,6 +70,8 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
+
+            pipeline::init(app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
