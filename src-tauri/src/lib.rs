@@ -1,3 +1,4 @@
+mod audio;
 mod permissions;
 mod secrets;
 mod windows;
