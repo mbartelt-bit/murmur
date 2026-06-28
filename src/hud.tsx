@@ -1,2 +1,3 @@
 import ReactDOM from "react-dom/client";
-ReactDOM.createRoot(document.getElementById("hud")!).render(<div>HUD</div>);
+import { Hud } from "./components/Hud";
+ReactDOM.createRoot(document.getElementById("hud")!).render(<Hud />);
