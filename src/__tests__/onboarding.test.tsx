@@ -7,6 +7,9 @@ vi.mock("../lib/ipc", () => ({
   requestMic: () => invoke("request_mic"),
   accessibilityTrusted: () => invoke("accessibility_trusted"),
   openPrivacyPane: (w: string) => invoke("open_privacy_pane", w),
+  modelReady: () => invoke("model_ready"),
+  downloadModel: () => invoke("download_model"),
+  onModelProgress: () => Promise.resolve(() => {}),
 }));
 
 import { Onboarding } from "../components/Onboarding";
@@ -14,10 +17,11 @@ import { Onboarding } from "../components/Onboarding";
 describe("Onboarding", () => {
   beforeEach(() => invoke.mockReset());
 
-  it("calls onReady when both permissions are granted", async () => {
+  it("calls onReady when all three gates are granted", async () => {
     invoke.mockImplementation((cmd: string) =>
       cmd === "mic_status" ? Promise.resolve("authorized")
       : cmd === "accessibility_trusted" ? Promise.resolve(true)
+      : cmd === "model_ready" ? Promise.resolve(true)
       : Promise.resolve(true));
     const onReady = vi.fn();
     render(<Onboarding onReady={onReady} />);
@@ -28,6 +32,7 @@ describe("Onboarding", () => {
     invoke.mockImplementation((cmd: string) =>
       cmd === "mic_status" ? Promise.resolve("notDetermined")
       : cmd === "accessibility_trusted" ? Promise.resolve(false)
+      : cmd === "model_ready" ? Promise.resolve(false)
       : Promise.resolve(true));
     render(<Onboarding onReady={vi.fn()} />);
     expect(await screen.findByRole("button", { name: /allow microphone/i })).toBeTruthy();

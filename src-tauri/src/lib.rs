@@ -1,4 +1,5 @@
 mod audio;
+mod model;
 mod permissions;
 mod resample;
 mod secrets;
@@ -74,6 +75,8 @@ pub fn run() {
             permissions::request_mic,
             permissions::accessibility_trusted,
             permissions::open_privacy_pane,
+            model::model_ready,
+            model::download_model,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Murmur");

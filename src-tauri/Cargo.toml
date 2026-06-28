@@ -26,3 +26,5 @@ macos-accessibility-client = "0.0.2"
 objc2 = "0.6.4"
 cpal = "0.18"
 anyhow = "1.0.103"
+reqwest = { version = "0.12", default-features = false, features = ["stream", "rustls-tls", "http2", "charset", "json"] }
+futures-util = "0.3"
