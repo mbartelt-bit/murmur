@@ -52,6 +52,13 @@ impl Pipeline {
 
 impl PttSink for Pipeline {
     fn start(&self, app: &AppHandle) {
+        // Belt-and-suspenders: if a prior session is somehow still live (double
+        // start), stop it first so only one mic/Stream is ever active. Sending
+        // its stop signal terminates that audio thread immediately.
+        if let Some(old) = self.session.lock().unwrap().take() {
+            let _ = old.stop_tx.send(());
+        }
+
         let (stop_tx, stop_rx) = mpsc::channel::<()>();
         let (samp_tx, samp_rx) = mpsc::channel::<(Vec<f32>, u32, u16)>();
         let app = app.clone();
@@ -75,10 +82,13 @@ impl PttSink for Pipeline {
             // Signal the start() caller that capture is live.
             let _ = ready_tx.send(Ok(()));
 
-            // Emit level meter until told to stop.
+            // Emit level meter until told to stop. Treat a disconnected sender
+            // (stop_tx dropped without a send — double-start overwrite or app
+            // shutdown) as a stop too, so we never spin forever holding the Stream.
             loop {
-                if stop_rx.try_recv().is_ok() {
-                    break;
+                match stop_rx.try_recv() {
+                    Ok(()) | Err(mpsc::TryRecvError::Disconnected) => break,
+                    Err(mpsc::TryRecvError::Empty) => {}
                 }
                 let l = *level.lock().unwrap();
                 let _ = audio_app.emit("vu-level", l as f64);
