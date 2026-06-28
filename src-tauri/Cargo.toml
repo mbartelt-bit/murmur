@@ -32,3 +32,4 @@ whisper-rs = { version = "0.16", features = ["metal"] }
 arboard = "3"
 enigo = "0.6"
 tauri-plugin-global-shortcut = "2.3.2"
+tauri-plugin-clipboard-manager = "2.3.2"

@@ -40,6 +40,7 @@ pub fn run() {
     }];
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(SqlBuilder::default().add_migrations("sqlite:murmur.db", migrations).build())
         .plugin(tauri_plugin_store::Builder::new().build())
         .setup(|app| {
