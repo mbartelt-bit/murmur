@@ -1,3 +1,4 @@
+mod secrets;
 mod windows;
 
 use tauri::{
@@ -62,6 +63,11 @@ pub fn run() {
                 .build(app)?;
             Ok(())
         })
+        .invoke_handler(tauri::generate_handler![
+            secrets::secret_set,
+            secrets::secret_get,
+            secrets::secret_delete,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running Murmur");
 }
