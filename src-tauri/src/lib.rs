@@ -3,6 +3,7 @@ mod model;
 mod permissions;
 mod resample;
 mod secrets;
+mod stt;
 mod windows;
 
 use tauri::{
