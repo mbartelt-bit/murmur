@@ -1,3 +1,4 @@
+mod permissions;
 mod secrets;
 mod windows;
 
@@ -67,6 +68,10 @@ pub fn run() {
             secrets::secret_set,
             secrets::secret_get,
             secrets::secret_delete,
+            permissions::mic_status,
+            permissions::request_mic,
+            permissions::accessibility_trusted,
+            permissions::open_privacy_pane,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Murmur");
