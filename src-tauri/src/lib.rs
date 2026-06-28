@@ -1,5 +1,6 @@
 mod audio;
 mod permissions;
+mod resample;
 mod secrets;
 mod windows;
 
