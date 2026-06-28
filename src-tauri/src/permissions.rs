@@ -22,14 +22,25 @@ mod mac {
 
     pub async fn request_mic_inner() -> bool {
         let (tx, rx) = mpsc::channel::<bool>();
-        let handler = RcBlock::new(move |granted: Bool| {
-            let _ = tx.send(granted.as_bool());
-        });
-        let media_type = unsafe { AVMediaTypeAudio.unwrap() };
-        unsafe {
-            AVCaptureDevice::requestAccessForMediaType_completionHandler(media_type, &handler);
+        // Scope the non-Send RcBlock so it is dropped before the `.await` below.
+        // requestAccess... returns immediately and AVFoundation retains the block
+        // internally, so dropping our local reference here is safe.
+        {
+            let handler = RcBlock::new(move |granted: Bool| {
+                let _ = tx.send(granted.as_bool());
+            });
+            let media_type = unsafe { AVMediaTypeAudio.unwrap() };
+            unsafe {
+                AVCaptureDevice::requestAccessForMediaType_completionHandler(
+                    media_type, &handler,
+                );
+            }
         }
-        rx.recv().unwrap_or(false)
+        // The completion handler fires on an internal queue. Move the blocking
+        // recv off the async worker thread.
+        tauri::async_runtime::spawn_blocking(move || rx.recv().unwrap_or(false))
+            .await
+            .unwrap_or(false)
     }
 }
 
@@ -71,11 +82,18 @@ pub fn accessibility_trusted() -> bool {
 
 #[tauri::command]
 pub fn open_privacy_pane(which: String) {
-    let url = match which.as_str() {
-        "accessibility" => {
-            "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
-        }
-        _ => "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone",
-    };
-    let _ = std::process::Command::new("open").arg(url).spawn();
+    #[cfg(target_os = "macos")]
+    {
+        let url = match which.as_str() {
+            "accessibility" => {
+                "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+            }
+            _ => "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone",
+        };
+        let _ = std::process::Command::new("open").arg(url).spawn();
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = which;
+    }
 }
