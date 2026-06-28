@@ -5,8 +5,10 @@ use std::{thread, time::Duration};
 fn cmd_v() -> Result<(), String> {
     let mut enigo = Enigo::new(&Settings::default()).map_err(|e| e.to_string())?;
     enigo.key(Key::Meta, Press).map_err(|e| e.to_string())?;
-    enigo.key(Key::Unicode('v'), Click).map_err(|e| e.to_string())?;
-    enigo.key(Key::Meta, Release).map_err(|e| e.to_string())?;
+    let click = enigo.key(Key::Unicode('v'), Click).map_err(|e| e.to_string());
+    let release = enigo.key(Key::Meta, Release).map_err(|e| e.to_string());
+    click?;
+    release?;
     Ok(())
 }
 

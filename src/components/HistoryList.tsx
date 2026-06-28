@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { insertTranscript, listTranscripts, deleteTranscript, type Transcript } from "../lib/db";
+import { listTranscripts, deleteTranscript, type Transcript } from "../lib/db";
 
 export function HistoryList() {
   const [rows, setRows] = useState<Transcript[]>([]);
@@ -11,8 +11,7 @@ export function HistoryList() {
     refresh();
     const un = listen<{ raw: string; clean: string; app: string | null }>(
       "dictation-complete",
-      async (e) => {
-        await insertTranscript(e.payload.raw, e.payload.clean, e.payload.app);
+      async (_e) => {
         refresh();
       },
     );
