@@ -61,6 +61,16 @@ export const setSecret = (key: string, value: string) => invoke<void>("secret_se
 export const getSecret = (key: string) => invoke<string | null>("secret_get", { key });
 export const deleteSecret = (key: string) => invoke<void>("secret_delete", { key });
 
+/** Open a URL in the default browser (macOS: uses `open`). */
+export const openUrl = (url: string) => invoke<void>("open_url", { url });
+
+/**
+ * Ping the provider's API with the stored key.
+ * Resolves "Connected" on success, rejects with a user-facing message on failure.
+ */
+export const verifyProvider = (provider: string) =>
+  invoke<string>("verify_provider", { provider });
+
 // --- Hotkey commands ---
 
 /** Returns the current recording shortcut accelerator string (e.g. "control+alt+KeyD"). */

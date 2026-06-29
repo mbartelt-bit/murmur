@@ -23,6 +23,8 @@ vi.mock("../lib/ipc", () => ({
   setSecret: (key: string, value: string) => invoke("secret_set", key, value),
   getSecret: (key: string) => invoke("secret_get", key),
   deleteSecret: (key: string) => invoke("secret_delete", key),
+  openUrl: (url: string) => invoke("open_url", url),
+  verifyProvider: (provider: string) => invoke("verify_provider", provider),
 }));
 
 import { Onboarding } from "../components/Onboarding";

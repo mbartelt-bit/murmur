@@ -97,3 +97,17 @@ pub fn open_privacy_pane(which: String) {
         let _ = which;
     }
 }
+
+/// Open an arbitrary HTTPS URL in the default browser.
+/// On macOS uses `open`; no-op on other platforms.
+#[tauri::command]
+pub fn open_url(url: String) {
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("open").arg(&url).spawn();
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = url;
+    }
+}

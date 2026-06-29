@@ -1,3 +1,4 @@
+use std::time::Duration;
 use tauri::AppHandle;
 use tauri_plugin_store::StoreExt;
 
@@ -92,4 +93,35 @@ fn key_present(account: &str) -> bool {
         .flatten()
         .map(|k| !k.is_empty())
         .unwrap_or(false)
+}
+
+/// Ping the provider's /models endpoint with the stored API key.
+/// Returns `Ok("Connected")` on HTTP 200, or `Err` with a user-facing message.
+#[tauri::command]
+pub fn verify_provider(provider: String) -> Result<String, String> {
+    let p = crate::provider::Provider::from_id(&provider)
+        .ok_or_else(|| "Unknown provider.".to_owned())?;
+
+    let key = crate::secrets::get(p.key_account())
+        .map_err(|e| e.to_string())?
+        .filter(|k| !k.is_empty())
+        .ok_or_else(|| "No API key saved yet.".to_owned())?;
+
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .build()
+        .map_err(|e| format!("Couldn't create HTTP client: {}", e))?;
+
+    let url = format!("{}/models", p.base_url());
+    let resp = client
+        .get(&url)
+        .bearer_auth(&key)
+        .send()
+        .map_err(|_| format!("Couldn't reach {} — check your connection.", provider))?;
+
+    match resp.status().as_u16() {
+        200 => Ok("Connected".to_owned()),
+        401 | 403 => Err("That key was rejected — double-check it and try again.".to_owned()),
+        s => Err(format!("Couldn't verify the key (HTTP {}).", s)),
+    }
 }

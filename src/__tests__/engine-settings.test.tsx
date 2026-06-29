@@ -12,6 +12,8 @@ vi.mock("../lib/ipc", () => ({
   modelReady: () => invoke("model_ready"),
   downloadModel: () => invoke("download_model"),
   onModelProgress: () => Promise.resolve(() => {}),
+  openUrl: (url: string) => invoke("open_url", url),
+  verifyProvider: (provider: string) => invoke("verify_provider", provider),
 }));
 
 import { EngineSettings } from "../components/EngineSettings";
@@ -92,6 +94,7 @@ describe("EngineSettings", () => {
       if (cmd === "model_ready") return Promise.resolve(false);
       if (cmd === "set_stt_engine") return Promise.resolve(undefined);
       if (cmd === "secret_set") return Promise.resolve(undefined);
+      if (cmd === "verify_provider") return Promise.resolve("Connected");
       return Promise.resolve(undefined);
     });
 
@@ -104,11 +107,17 @@ describe("EngineSettings", () => {
     const keyInput = await screen.findByPlaceholderText(/openai api key/i);
     fireEvent.change(keyInput, { target: { value: "sk-test-key-123" } });
 
-    const saveBtn = screen.getByRole("button", { name: /save/i });
-    fireEvent.click(saveBtn);
+    // Button is now labeled "Connect"
+    const connectBtn = screen.getByRole("button", { name: /connect/i });
+    fireEvent.click(connectBtn);
 
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith("secret_set", "openai_api_key", "sk-test-key-123")
+    );
+
+    // Auto-verify fires after save
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("verify_provider", "openai")
     );
   });
 });

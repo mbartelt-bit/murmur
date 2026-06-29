@@ -8,6 +8,8 @@ import {
   downloadModel,
   onModelProgress,
   modelReady,
+  openUrl,
+  verifyProvider,
   type EngineSettings as EngineSettingsData,
 } from "../lib/ipc";
 
@@ -27,6 +29,21 @@ const CLEANUP_OPTIONS = [
   { value: "groq", label: "Groq" },
 ] as const;
 
+const PROVIDER_KEY_PAGE: Record<string, string> = {
+  openai: "https://platform.openai.com/api-keys",
+  groq: "https://console.groq.com/keys",
+};
+
+const PROVIDER_KEY_ACCOUNT: Record<string, string> = {
+  openai: "openai_api_key",
+  groq: "groq_api_key",
+};
+
+const PROVIDER_LABEL: Record<string, string> = {
+  openai: "OpenAI",
+  groq: "Groq",
+};
+
 export function EngineSettings({ onChange }: Props) {
   const [settings, setSettings] = useState<EngineSettingsData | null>(null);
   const [localModelReady, setLocalModelReady] = useState(false);
@@ -37,7 +54,10 @@ export function EngineSettings({ onChange }: Props) {
   const [openaiInput, setOpenaiInput] = useState("");
   const [groqInput, setGroqInput] = useState("");
   const [savingKey, setSavingKey] = useState<string | null>(null);
-  const [keyError, setKeyError] = useState<string | null>(null);
+
+  // Per-provider verify state: "idle" | "verifying" | "ok" | error message
+  const [openaiVerify, setOpenaiVerify] = useState<string>("idle");
+  const [groqVerify, setGroqVerify] = useState<string>("idle");
 
   // refresh re-reads state only; it must NOT call onChange (that would fire on
   // mount and feed back into onboarding's readiness poll). onChange fires only
@@ -54,7 +74,6 @@ export function EngineSettings({ onChange }: Props) {
 
   const handleSttChange = useCallback(
     async (value: string) => {
-      setKeyError(null); // clear any stale key error when switching provider
       await setSttEngine(value);
       await refresh();
       onChange?.();
@@ -71,36 +90,57 @@ export function EngineSettings({ onChange }: Props) {
     [refresh, onChange]
   );
 
+  const setVerifyState = useCallback((provider: string, state: string) => {
+    if (provider === "openai") setOpenaiVerify(state);
+    else setGroqVerify(state);
+  }, []);
+
+  const handleVerify = useCallback(
+    async (provider: string) => {
+      setVerifyState(provider, "verifying");
+      try {
+        await verifyProvider(provider);
+        setVerifyState(provider, "ok");
+      } catch (e) {
+        setVerifyState(provider, e instanceof Error ? e.message : String(e));
+      }
+    },
+    [setVerifyState]
+  );
+
   const handleSaveKey = useCallback(
     async (provider: "openai" | "groq") => {
-      const keyName = provider === "openai" ? "openai_api_key" : "groq_api_key";
+      const keyName = PROVIDER_KEY_ACCOUNT[provider];
       const keyValue = provider === "openai" ? openaiInput : groqInput;
       if (!keyValue.trim()) return;
       setSavingKey(provider);
-      setKeyError(null);
+      setVerifyState(provider, "idle");
       try {
         await setSecret(keyName, keyValue.trim());
         if (provider === "openai") setOpenaiInput("");
         else setGroqInput("");
         await refresh();
         onChange?.();
+        // Auto-verify after saving so user gets immediate feedback
+        await handleVerify(provider);
       } catch (e) {
-        setKeyError(e instanceof Error ? e.message : String(e));
+        setVerifyState(provider, e instanceof Error ? e.message : String(e));
       } finally {
         setSavingKey(null);
       }
     },
-    [openaiInput, groqInput, refresh, onChange]
+    [openaiInput, groqInput, refresh, onChange, handleVerify, setVerifyState]
   );
 
   const handleRemoveKey = useCallback(
     async (provider: "openai" | "groq") => {
-      const keyName = provider === "openai" ? "openai_api_key" : "groq_api_key";
+      const keyName = PROVIDER_KEY_ACCOUNT[provider];
       await deleteSecret(keyName);
+      setVerifyState(provider, "idle");
       await refresh();
       onChange?.();
     },
-    [refresh, onChange]
+    [refresh, onChange, setVerifyState]
   );
 
   const handleDownloadModel = useCallback(async () => {
@@ -124,6 +164,14 @@ export function EngineSettings({ onChange }: Props) {
       </div>
     );
   }
+
+  // Compute the set of cloud providers currently IN USE by stt or cleanup.
+  // This is the gap fix: if Local STT + OpenAI cleanup, OpenAI key block still shows.
+  const cloudProvidersInUse = Array.from(
+    new Set(
+      [settings.stt, settings.cleanup].filter((v) => v === "openai" || v === "groq")
+    )
+  ) as ("openai" | "groq")[];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -181,34 +229,6 @@ export function EngineSettings({ onChange }: Props) {
             )}
           </div>
         )}
-
-        {/* OpenAI key sub-row */}
-        {settings.stt === "openai" && (
-          <KeyRow
-            provider="openai"
-            keySet={settings.openai_key}
-            input={openaiInput}
-            onInput={setOpenaiInput}
-            onSave={() => handleSaveKey("openai")}
-            onRemove={() => handleRemoveKey("openai")}
-            saving={savingKey === "openai"}
-            error={keyError}
-          />
-        )}
-
-        {/* Groq key sub-row */}
-        {settings.stt === "groq" && (
-          <KeyRow
-            provider="groq"
-            keySet={settings.groq_key}
-            input={groqInput}
-            onInput={setGroqInput}
-            onSave={() => handleSaveKey("groq")}
-            onRemove={() => handleRemoveKey("groq")}
-            saving={savingKey === "groq"}
-            error={keyError}
-          />
-        )}
       </section>
 
       {/* Cleanup engine */}
@@ -234,52 +254,96 @@ export function EngineSettings({ onChange }: Props) {
             </label>
           ))}
         </div>
-        {(settings.cleanup === "openai" || settings.cleanup === "groq") && (
-          <p style={{ marginTop: 8, fontSize: 12, color: "var(--text-2)" }}>
-            Cleanup uses the same API key as the matching transcription provider.
-            If the key is missing, cleanup falls back to rule-based.
-          </p>
-        )}
       </section>
+
+      {/* Guided Connect blocks — one per in-use cloud provider */}
+      {cloudProvidersInUse.map((provider) => (
+        <ConnectBlock
+          key={provider}
+          provider={provider}
+          keySet={provider === "openai" ? settings.openai_key : settings.groq_key}
+          input={provider === "openai" ? openaiInput : groqInput}
+          onInput={provider === "openai" ? setOpenaiInput : setGroqInput}
+          onSave={() => handleSaveKey(provider)}
+          onRemove={() => handleRemoveKey(provider)}
+          onVerify={() => handleVerify(provider)}
+          saving={savingKey === provider}
+          verifyState={provider === "openai" ? openaiVerify : groqVerify}
+        />
+      ))}
     </div>
   );
 }
 
-// ── Internal sub-component ────────────────────────────────────────────────────
+// ── Guided Connect block ──────────────────────────────────────────────────────
 
-interface KeyRowProps {
+interface ConnectBlockProps {
   provider: "openai" | "groq";
   keySet: boolean;
   input: string;
   onInput: (v: string) => void;
   onSave: () => void;
   onRemove: () => void;
+  onVerify: () => void;
   saving: boolean;
-  error: string | null;
+  verifyState: string; // "idle" | "verifying" | "ok" | error message
 }
 
-function KeyRow({
+function ConnectBlock({
   provider,
   keySet,
   input,
   onInput,
   onSave,
   onRemove,
+  onVerify,
   saving,
-  error,
-}: KeyRowProps) {
-  const label = provider === "openai" ? "OpenAI" : "Groq";
+  verifyState,
+}: ConnectBlockProps) {
+  const label = PROVIDER_LABEL[provider];
+  const keyPage = PROVIDER_KEY_PAGE[provider];
+
   return (
-    <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+    <section className="card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {/* Header row */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div className="section-label" style={{ marginBottom: 0 }}>Connect {label}</div>
+        <button
+          className="btn btn-ghost"
+          style={{ fontSize: 12, padding: "3px 10px" }}
+          onClick={() => openUrl(keyPage)}
+        >
+          Get your API key ↗
+        </button>
+      </div>
+
+      {/* Inline step hint */}
+      <p style={{ margin: 0, fontSize: 12, color: "var(--text-2)", lineHeight: 1.5 }}>
+        1. Create a key &nbsp;&nbsp;2. Copy it &nbsp;&nbsp;3. Paste below
+      </p>
+
+      {/* Key input or saved state */}
       {keySet ? (
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <span className="badge-ok">
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
               <path d="M2 5l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            {label} key saved
+            Key saved
           </span>
-          <button className="btn btn-ghost" onClick={onRemove} style={{ padding: "3px 10px", fontSize: 12 }}>
+          <button
+            className="btn btn-ghost"
+            style={{ fontSize: 12, padding: "3px 10px" }}
+            onClick={onVerify}
+            disabled={verifyState === "verifying"}
+          >
+            Verify
+          </button>
+          <button
+            className="btn btn-ghost"
+            style={{ fontSize: 12, padding: "3px 10px" }}
+            onClick={onRemove}
+          >
             Remove
           </button>
         </div>
@@ -298,13 +362,26 @@ function KeyRow({
             onClick={onSave}
             disabled={saving || !input.trim()}
           >
-            {saving ? "Saving…" : "Save"}
+            {saving ? "Connecting…" : "Connect"}
           </button>
         </div>
       )}
-      {error && (
-        <p style={{ fontSize: 12, color: "var(--danger)", margin: 0 }}>{error}</p>
+
+      {/* Verify status line */}
+      {verifyState === "verifying" && (
+        <p style={{ margin: 0, fontSize: 12, color: "var(--text-2)" }}>Verifying…</p>
       )}
-    </div>
+      {verifyState === "ok" && (
+        <span className="badge-ok" style={{ alignSelf: "flex-start" }}>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <path d="M2 5l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Connected
+        </span>
+      )}
+      {verifyState !== "idle" && verifyState !== "verifying" && verifyState !== "ok" && (
+        <p style={{ margin: 0, fontSize: 12, color: "var(--danger)" }}>{verifyState}</p>
+      )}
+    </section>
   );
 }

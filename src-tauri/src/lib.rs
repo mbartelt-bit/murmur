@@ -86,6 +86,7 @@ pub fn run() {
             permissions::request_mic,
             permissions::accessibility_trusted,
             permissions::open_privacy_pane,
+            permissions::open_url,
             model::model_ready,
             model::download_model,
             hotkey::get_hotkey,
@@ -94,6 +95,7 @@ pub fn run() {
             engines::set_stt_engine,
             engines::set_cleanup_engine,
             engines::stt_ready,
+            engines::verify_provider,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Murmur");
