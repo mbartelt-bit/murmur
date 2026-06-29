@@ -119,22 +119,24 @@ export function EngineSettings({ onChange }: Props) {
 
   if (!settings) {
     return (
-      <div className="px-4 py-3 text-sm opacity-50">Loading engine settings…</div>
+      <div style={{ padding: "12px 0", color: "var(--text-2)", fontSize: 13, opacity: 0.6 }}>
+        Loading engine settings…
+      </div>
     );
   }
 
   return (
-    <div className="space-y-5 px-4 py-3">
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       {/* Transcription engine */}
       <section>
-        <p className="text-xs font-semibold uppercase tracking-wide opacity-50 mb-2">
-          Transcription engine
-        </p>
-        <div className="space-y-2">
+        <div className="section-label">Transcription</div>
+        {/* Segmented control — radio inputs hidden visually, accessible by role */}
+        <div className="seg" role="radiogroup" aria-label="Transcription engine">
           {STT_OPTIONS.map((opt) => (
             <label
               key={opt.value}
-              className="flex items-center gap-2 cursor-pointer text-sm"
+              className={`seg-item${settings.stt === opt.value ? " is-sel" : ""}`}
+              style={{ cursor: "pointer" }}
             >
               <input
                 type="radio"
@@ -142,7 +144,8 @@ export function EngineSettings({ onChange }: Props) {
                 value={opt.value}
                 checked={settings.stt === opt.value}
                 onChange={() => handleSttChange(opt.value)}
-                className="accent-blue-500"
+                style={{ position: "absolute", opacity: 0, width: 0, height: 0, margin: 0 }}
+                aria-checked={settings.stt === opt.value}
               />
               {opt.label}
             </label>
@@ -151,35 +154,35 @@ export function EngineSettings({ onChange }: Props) {
 
         {/* Local model sub-row */}
         {settings.stt === "local" && (
-          <div className="mt-3 ml-5 text-sm">
+          <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
             {localModelReady ? (
-              <span className="text-green-600 dark:text-green-400">
-                ✓ model ready
+              <span className="badge-ok">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                  <path d="M2 5l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Model ready
               </span>
             ) : modelDownloading ? (
-              <div className="flex items-center gap-2">
-                <div className="w-32 h-2 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div className="progress-track" style={{ width: 128 }}>
                   <div
-                    className="h-full bg-blue-500 transition-all"
+                    className="progress-fill"
                     style={{ width: `${Math.round((modelProgress ?? 0) * 100)}%` }}
                   />
                 </div>
-                <span className="text-xs opacity-60">
+                <span style={{ fontSize: 12, color: "var(--text-2)" }}>
                   {Math.round((modelProgress ?? 0) * 100)}%
                 </span>
               </div>
             ) : (
-              <button
-                onClick={handleDownloadModel}
-                className="text-xs underline opacity-70 hover:opacity-100"
-              >
+              <button className="btn btn-primary" onClick={handleDownloadModel} style={{ alignSelf: "flex-start" }}>
                 Download model (~142 MB)
               </button>
             )}
           </div>
         )}
 
-        {/* OpenAI key sub-row (shown for STT = openai, or when key might also be needed) */}
+        {/* OpenAI key sub-row */}
         {settings.stt === "openai" && (
           <KeyRow
             provider="openai"
@@ -210,14 +213,13 @@ export function EngineSettings({ onChange }: Props) {
 
       {/* Cleanup engine */}
       <section>
-        <p className="text-xs font-semibold uppercase tracking-wide opacity-50 mb-2">
-          Cleanup engine
-        </p>
-        <div className="space-y-2">
+        <div className="section-label">Cleanup</div>
+        <div className="seg" role="radiogroup" aria-label="Cleanup engine">
           {CLEANUP_OPTIONS.map((opt) => (
             <label
               key={opt.value}
-              className="flex items-center gap-2 cursor-pointer text-sm"
+              className={`seg-item${settings.cleanup === opt.value ? " is-sel" : ""}`}
+              style={{ cursor: "pointer" }}
             >
               <input
                 type="radio"
@@ -225,14 +227,15 @@ export function EngineSettings({ onChange }: Props) {
                 value={opt.value}
                 checked={settings.cleanup === opt.value}
                 onChange={() => handleCleanupChange(opt.value)}
-                className="accent-blue-500"
+                style={{ position: "absolute", opacity: 0, width: 0, height: 0, margin: 0 }}
+                aria-checked={settings.cleanup === opt.value}
               />
               {opt.label}
             </label>
           ))}
         </div>
         {(settings.cleanup === "openai" || settings.cleanup === "groq") && (
-          <p className="mt-2 ml-5 text-xs opacity-50">
+          <p style={{ marginTop: 8, fontSize: 12, color: "var(--text-2)" }}>
             Cleanup uses the same API key as the matching transcription provider.
             If the key is missing, cleanup falls back to rule-based.
           </p>
@@ -267,38 +270,41 @@ function KeyRow({
 }: KeyRowProps) {
   const label = provider === "openai" ? "OpenAI" : "Groq";
   return (
-    <div className="mt-3 ml-5 space-y-1">
+    <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
       {keySet ? (
-        <div className="flex items-center gap-3 text-sm">
-          <span className="text-green-600 dark:text-green-400">
-            ✓ {label} key saved
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span className="badge-ok">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+              <path d="M2 5l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            {label} key saved
           </span>
-          <button
-            onClick={onRemove}
-            className="text-xs underline opacity-60 hover:opacity-100"
-          >
+          <button className="btn btn-ghost" onClick={onRemove} style={{ padding: "3px 10px", fontSize: 12 }}>
             Remove
           </button>
         </div>
       ) : (
-        <div className="flex items-center gap-2">
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <input
             type="password"
             value={input}
             onChange={(e) => onInput(e.target.value)}
             placeholder={`${label} API key`}
-            className="text-sm border rounded px-2 py-1 bg-background w-48 font-mono"
+            className="input"
+            style={{ fontFamily: "monospace", maxWidth: 220 }}
           />
           <button
+            className="btn btn-primary"
             onClick={onSave}
             disabled={saving || !input.trim()}
-            className="text-xs underline opacity-70 hover:opacity-100 disabled:opacity-30"
           >
             {saving ? "Saving…" : "Save"}
           </button>
         </div>
       )}
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && (
+        <p style={{ fontSize: 12, color: "var(--danger)", margin: 0 }}>{error}</p>
+      )}
     </div>
   );
 }

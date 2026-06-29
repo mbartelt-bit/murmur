@@ -159,24 +159,27 @@ export function HotkeySetting() {
   const displayLabel = accel ? formatAccelerator(accel) : "…";
 
   return (
-    <div className="flex items-center justify-between px-4 py-2">
-      <span className="text-sm font-medium">Recording shortcut</span>
-      <div className="flex items-center gap-3">
-        {capturing ? (
-          <span className="text-sm opacity-70 italic">
-            Press a key combo… (Esc to cancel)
-          </span>
-        ) : (
-          <kbd className="text-sm font-mono bg-muted px-2 py-0.5 rounded border">
-            {displayLabel}
-          </kbd>
-        )}
-        {errorMsg && (
-          <span className="text-xs text-destructive">{errorMsg}</span>
-        )}
+    <div>
+      <div className="section-label">Recording shortcut</div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {capturing ? (
+            <span style={{ fontSize: 13, color: "var(--text-2)", fontStyle: "italic" }}>
+              Press a key combo… (Esc to cancel)
+            </span>
+          ) : (
+            /* Single kbd chip containing the full formatted label.
+               Tests use screen.getByText("⌃⌥D") which matches this text node. */
+            <kbd className="kbd">{displayLabel}</kbd>
+          )}
+          {errorMsg && (
+            <span style={{ fontSize: 12, color: "var(--danger)" }}>{errorMsg}</span>
+          )}
+        </div>
         {!capturing && (
           <button
-            className="text-xs underline opacity-70 hover:opacity-100"
+            className="btn btn-ghost"
+            style={{ padding: "4px 10px", fontSize: 12 }}
             onClick={() => {
               setErrorMsg(null);
               setCapturing(true);
