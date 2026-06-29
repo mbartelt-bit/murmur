@@ -5,10 +5,18 @@ use std::{thread, time::Duration};
 fn cmd_v() -> Result<(), String> {
     let mut enigo = Enigo::new(&Settings::default()).map_err(|e| e.to_string())?;
     enigo.key(Key::Meta, Press).map_err(|e| e.to_string())?;
-    let click = enigo.key(Key::Unicode('v'), Click).map_err(|e| e.to_string());
-    let release = enigo.key(Key::Meta, Release).map_err(|e| e.to_string());
-    click?;
-    release?;
+
+    // Release Meta on every exit path — including a panic or an early `?`
+    // return from the click below — so we never leave ⌘ stuck down.
+    struct MetaGuard<'a>(&'a mut Enigo);
+    impl Drop for MetaGuard<'_> {
+        fn drop(&mut self) {
+            let _ = self.0.key(Key::Meta, Release);
+        }
+    }
+    let mut guard = MetaGuard(&mut enigo);
+
+    guard.0.key(Key::Unicode('v'), Click).map_err(|e| e.to_string())?;
     Ok(())
 }
 

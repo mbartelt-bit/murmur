@@ -1,6 +1,7 @@
 use std::time::Duration;
 use tauri::AppHandle;
 use tauri_plugin_store::StoreExt;
+use zeroize::Zeroizing;
 
 /// Returned by `get_engine_settings` — tells the UI what's currently chosen
 /// and whether API keys are present (without exposing the key values).
@@ -102,10 +103,12 @@ pub fn verify_provider(provider: String) -> Result<String, String> {
     let p = crate::provider::Provider::from_id(&provider)
         .ok_or_else(|| "Unknown provider.".to_owned())?;
 
-    let key = crate::secrets::get(p.key_account())
-        .map_err(|e| e.to_string())?
-        .filter(|k| !k.is_empty())
-        .ok_or_else(|| "No API key saved yet.".to_owned())?;
+    let key = Zeroizing::new(
+        crate::secrets::get(p.key_account())
+            .map_err(|e| e.to_string())?
+            .filter(|k| !k.is_empty())
+            .ok_or_else(|| "No API key saved yet.".to_owned())?,
+    );
 
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(10))
@@ -115,7 +118,7 @@ pub fn verify_provider(provider: String) -> Result<String, String> {
     let url = format!("{}/models", p.base_url());
     let resp = client
         .get(&url)
-        .bearer_auth(&key)
+        .bearer_auth(key.as_str())
         .send()
         .map_err(|_| format!("Couldn't reach {} — check your connection.", provider))?;
 

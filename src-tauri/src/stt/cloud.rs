@@ -1,4 +1,5 @@
 use super::SttEngine;
+use zeroize::Zeroizing;
 
 #[derive(serde::Deserialize)]
 struct TranscriptionResponse {
@@ -8,7 +9,7 @@ struct TranscriptionResponse {
 pub struct CloudStt {
     base_url: String,
     model: String,
-    api_key: String,
+    api_key: Zeroizing<String>,
 }
 
 impl CloudStt {
@@ -20,7 +21,7 @@ impl CloudStt {
         Self {
             base_url: base_url.into(),
             model: model.into(),
-            api_key: api_key.into(),
+            api_key: Zeroizing::new(api_key.into()),
         }
     }
 }
@@ -50,7 +51,7 @@ impl SttEngine for CloudStt {
         let client = reqwest::blocking::Client::new();
         let response = client
             .post(&url)
-            .bearer_auth(&self.api_key)
+            .bearer_auth(self.api_key.as_str())
             .multipart(form)
             .send()?;
 

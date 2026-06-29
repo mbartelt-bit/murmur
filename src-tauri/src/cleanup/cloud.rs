@@ -1,4 +1,5 @@
 use super::CleanupEngine;
+use zeroize::Zeroizing;
 
 const CLEAN_PROMPT: &str = "\
 You are a transcription cleanup assistant. Your job is to fix capitalization and punctuation, \
@@ -10,7 +11,7 @@ Return ONLY the cleaned text with no preamble, explanation, or commentary.";
 pub struct CloudCleanup {
     base_url: String,
     model: String,
-    api_key: String,
+    api_key: Zeroizing<String>,
 }
 
 impl CloudCleanup {
@@ -22,7 +23,7 @@ impl CloudCleanup {
         Self {
             base_url: base_url.into(),
             model: model.into(),
-            api_key: api_key.into(),
+            api_key: Zeroizing::new(api_key.into()),
         }
     }
 
@@ -40,7 +41,7 @@ impl CloudCleanup {
         let client = reqwest::blocking::Client::new();
         let response = client
             .post(&url)
-            .bearer_auth(&self.api_key)
+            .bearer_auth(self.api_key.as_str())
             .json(&body)
             .send()?;
 

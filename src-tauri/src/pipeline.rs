@@ -100,7 +100,8 @@ impl PttSink for Pipeline {
         });
 
         // Wait for the audio thread to confirm capture started (or failed).
-        match ready_rx.recv() {
+        // Bounded so a hung mic init can't freeze the hotkey caller forever.
+        match ready_rx.recv_timeout(std::time::Duration::from_secs(5)) {
             Ok(Ok(())) => {
                 windows::show_hud(&app);
                 *self.session.lock().unwrap() = Some(Session {
@@ -111,7 +112,10 @@ impl PttSink for Pipeline {
             Ok(Err(e)) => {
                 let _ = app.emit("dictation-error", e);
             }
-            Err(_) => {
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                let _ = app.emit("dictation-error", "Couldn't start the microphone in time.".to_string());
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
                 let _ = app.emit("dictation-error", "audio thread terminated unexpectedly".to_string());
             }
         }

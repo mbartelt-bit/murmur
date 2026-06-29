@@ -13,13 +13,6 @@ impl Provider {
         }
     }
 
-    pub fn id(&self) -> &'static str {
-        match self {
-            Self::OpenAI => "openai",
-            Self::Groq => "groq",
-        }
-    }
-
     pub fn base_url(&self) -> &'static str {
         match self {
             Self::OpenAI => "https://api.openai.com/v1",

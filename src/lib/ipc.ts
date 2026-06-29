@@ -58,7 +58,6 @@ export const setSttEngine = (value: string) => invoke<void>("set_stt_engine", { 
 export const setCleanupEngine = (value: string) => invoke<void>("set_cleanup_engine", { value });
 export const sttReady = () => invoke<boolean>("stt_ready");
 export const setSecret = (key: string, value: string) => invoke<void>("secret_set", { key, value });
-export const getSecret = (key: string) => invoke<string | null>("secret_get", { key });
 export const deleteSecret = (key: string) => invoke<void>("secret_delete", { key });
 
 /** Open a URL in the default browser (macOS: uses `open`). */

@@ -20,6 +20,7 @@ serde_json = "1"
 tauri-plugin-sql = { version = "2.4.0", features = ["sqlite"] }
 tauri-plugin-store = "2.4.3"
 keyring = { version = "3", features = ["apple-native"] }
+zeroize = "1"
 objc2-av-foundation = { version = "0.3.2", features = ["AVCaptureDevice", "AVMediaFormat"] }
 block2 = "0.6.2"
 macos-accessibility-client = "0.0.2"
