@@ -1,5 +1,8 @@
+mod cloud;
 mod local;
 use std::path::PathBuf;
+
+pub use cloud::CloudStt;
 
 pub trait SttEngine {
     /// 16kHz mono f32 in; transcribed text out. `prompt` biases vocabulary.

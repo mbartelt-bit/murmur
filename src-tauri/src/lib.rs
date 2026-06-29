@@ -5,9 +5,11 @@ mod insert;
 mod model;
 mod permissions;
 mod pipeline;
+mod provider;
 mod resample;
 mod secrets;
 mod stt;
+mod wav;
 mod windows;
 
 use tauri::{
