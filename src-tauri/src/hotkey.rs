@@ -80,7 +80,7 @@ pub trait PttSink: Send + Sync {
     fn stop(&self, app: &AppHandle);
 }
 
-/// Register `⌘⇧D` as a global shortcut and wire it to `sink`.
+/// Register `⌃⌥D` (Control+Option+D) as a global shortcut and wire it to `sink`.
 ///
 /// On `Pressed`:
 ///   - `StartHold` / `ToggleOn` → emit `"hud-state"` = `"recording"` + `sink.start()`
@@ -93,7 +93,7 @@ pub trait PttSink: Send + Sync {
 /// This function compiles but is NOT called until Task 13 wires the pipeline.
 #[allow(dead_code)]
 pub fn register(app: &AppHandle, sink: Arc<dyn PttSink>) -> tauri::Result<()> {
-    let shortcut = Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyD);
+    let shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyD);
     let state = Arc::new(Mutex::new(DoubleTap::default()));
     let sink2 = sink.clone();
 

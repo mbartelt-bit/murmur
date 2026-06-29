@@ -24,7 +24,7 @@ export function HistoryList() {
     <div className="p-4 space-y-2">
       <h2 className="font-semibold">Recent dictations</h2>
       {rows.length === 0 && (
-        <p className="text-sm opacity-60">No dictations yet. Hold ⌘⇧D to start.</p>
+        <p className="text-sm opacity-60">No dictations yet. Hold ⌃⌥D to start.</p>
       )}
       {rows.map((r) => (
         <div key={r.id} className="flex items-start justify-between gap-3 border-b py-2">
