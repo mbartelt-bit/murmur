@@ -102,6 +102,10 @@ pub fn open_privacy_pane(which: String) {
 /// On macOS uses `open`; no-op on other platforms.
 #[tauri::command]
 pub fn open_url(url: String) {
+    // Only ever open https:// links (provider key pages) — never file:// or app schemes.
+    if !url.starts_with("https://") {
+        return;
+    }
     #[cfg(target_os = "macos")]
     {
         let _ = std::process::Command::new("open").arg(&url).spawn();
