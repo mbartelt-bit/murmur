@@ -44,6 +44,25 @@ export const onDictationError = (cb: (message: string) => void) =>
 
 // --- Hotkey commands ---
 
+// --- Engine settings (BYOK) ---
+
+export interface EngineSettings {
+  stt: string;
+  cleanup: string;
+  openai_key: boolean;
+  groq_key: boolean;
+}
+
+export const getEngineSettings = () => invoke<EngineSettings>("get_engine_settings");
+export const setSttEngine = (value: string) => invoke<void>("set_stt_engine", { value });
+export const setCleanupEngine = (value: string) => invoke<void>("set_cleanup_engine", { value });
+export const sttReady = () => invoke<boolean>("stt_ready");
+export const setSecret = (key: string, value: string) => invoke<void>("secret_set", { key, value });
+export const getSecret = (key: string) => invoke<string | null>("secret_get", { key });
+export const deleteSecret = (key: string) => invoke<void>("secret_delete", { key });
+
+// --- Hotkey commands ---
+
 /** Returns the current recording shortcut accelerator string (e.g. "control+alt+KeyD"). */
 export const getHotkey = (): Promise<string> => invoke<string>("get_hotkey");
 
