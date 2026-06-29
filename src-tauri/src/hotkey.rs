@@ -87,6 +87,10 @@ pub trait PttSink: Send + Sync {
 /// Managed state that holds the currently-active shortcut and the double-tap
 /// state machine.  Both are behind `Mutex` so commands can swap the shortcut
 /// at runtime while the plugin handler reads it concurrently.
+///
+/// LOCK CONSTRAINT: the plugin handler holds `tap` locked across `PttSink::start`
+/// / `stop`.  A `PttSink` implementation MUST NOT acquire these mutexes (directly
+/// or transitively) or it will deadlock the hotkey handler.
 pub struct Hotkeys {
     pub current: Mutex<Shortcut>,
     pub tap: Mutex<DoubleTap>,
@@ -206,8 +210,10 @@ pub fn set_hotkey(app: AppHandle, accelerator: String) -> Result<(), String> {
     let mut current = state.current.lock().unwrap();
     let old_sc = *current;
 
-    // Unregister old shortcut.
+    // Unregister old shortcut. If this fails, make a best-effort attempt to keep
+    // the old shortcut active so the user is never left with NO working hotkey.
     if let Err(e) = app.global_shortcut().unregister(old_sc) {
+        let _ = app.global_shortcut().register(old_sc);
         return Err(format!("Failed to unregister old shortcut: {e}"));
     }
 
