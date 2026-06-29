@@ -1,6 +1,21 @@
-# Custom Hotkey Feature — Implementation Report
+# Custom Hotkey — Implementation Report
 
-## Summary
+**Branch:** feat/custom-hotkey
+**Date:** 2026-06-29
+
+## Check results
+
+| Check | Result |
+|---|---|
+| `cargo build` | PASS — 0 errors, 2 pre-existing warnings |
+| `cargo test` | PASS — 22/22 (20 existing + 2 new) |
+| `npx vitest run` | PASS — 21/21 across 6 files |
+| `npm run build` | PASS — both entries built cleanly |
+
+## Device gate
+Live OS hot-key re-registration must be verified on device — the OS may deny combos already claimed by system or other apps.
+
+## Old summary (preserved)
 
 User-configurable recording hotkey is now fully implemented. The shortcut defaults to `Control+Alt+KeyD` (⌃⌥D) and can be changed in-app via a capture UI row in Settings.
 
