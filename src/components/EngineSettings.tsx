@@ -17,23 +17,53 @@ interface Props {
   onChange?: () => void;
 }
 
+// ── Per-provider metadata ────────────────────────────────────────────────────
+
+interface ProviderInfo {
+  keyPage: string;
+  costLabel: string;
+  costTone: "free" | "paid";
+  steps: string[];
+}
+
+const PROVIDER_INFO: Record<"openai" | "groq", ProviderInfo> = {
+  groq: {
+    keyPage: "https://console.groq.com/keys",
+    costLabel: "Free tier · no card",
+    costTone: "free",
+    steps: [
+      "Sign in with Google or GitHub",
+      'Click "Create API Key"',
+      "Copy it and paste below",
+    ],
+  },
+  openai: {
+    keyPage: "https://platform.openai.com/api-keys",
+    costLabel: "Pay-as-you-go · card required",
+    costTone: "paid",
+    steps: [
+      "Add ~$5 credit + a card",
+      'Click "Create new secret key"',
+      "Copy it and paste below",
+    ],
+  },
+};
+
+// ── Segmented control option definitions ────────────────────────────────────
+
 const STT_OPTIONS = [
-  { value: "local", label: "Local (on-device Whisper)" },
-  { value: "openai", label: "OpenAI" },
-  { value: "groq", label: "Groq" },
+  { value: "local", label: "Local (on-device Whisper)", free: true },
+  { value: "openai", label: "OpenAI", free: false },
+  { value: "groq", label: "Groq", free: true },
 ] as const;
 
 const CLEANUP_OPTIONS = [
-  { value: "rule", label: "Rule-based (local, free)" },
-  { value: "openai", label: "OpenAI" },
-  { value: "groq", label: "Groq" },
+  { value: "rule", label: "Rule-based (local, free)", free: true },
+  { value: "openai", label: "OpenAI", free: false },
+  { value: "groq", label: "Groq", free: true },
 ] as const;
 
-const PROVIDER_KEY_PAGE: Record<string, string> = {
-  openai: "https://platform.openai.com/api-keys",
-  groq: "https://console.groq.com/keys",
-};
-
+// Legacy maps kept for compatibility (keys/labels still used in ConnectBlock)
 const PROVIDER_KEY_ACCOUNT: Record<string, string> = {
   openai: "openai_api_key",
   groq: "groq_api_key",
@@ -43,6 +73,59 @@ const PROVIDER_LABEL: Record<string, string> = {
   openai: "OpenAI",
   groq: "Groq",
 };
+
+// ── Small cost pill ──────────────────────────────────────────────────────────
+
+function CostBadge({ tone, label }: { tone: "free" | "paid"; label: string }) {
+  if (tone === "free") {
+    return (
+      <span
+        className="badge-ok"
+        style={{ fontSize: 11, padding: "1px 7px", fontWeight: 500 }}
+        aria-label={label}
+      >
+        {label}
+      </span>
+    );
+  }
+  return (
+    <span
+      style={{
+        fontSize: 11,
+        padding: "1px 7px",
+        fontWeight: 500,
+        borderRadius: 999,
+        background: "rgba(128,128,128,0.12)",
+        color: "var(--text-2)",
+        display: "inline-flex",
+        alignItems: "center",
+      }}
+      aria-label={label}
+    >
+      {label}
+    </span>
+  );
+}
+
+// ── Free dot indicator (inside seg-item label) ───────────────────────────────
+
+function FreeDot() {
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        display: "inline-block",
+        width: 6,
+        height: 6,
+        borderRadius: "50%",
+        background: "var(--ok)",
+        marginLeft: 5,
+        verticalAlign: "middle",
+        flexShrink: 0,
+      }}
+    />
+  );
+}
 
 export function EngineSettings({ onChange }: Props) {
   const [settings, setSettings] = useState<EngineSettingsData | null>(null);
@@ -184,7 +267,7 @@ export function EngineSettings({ onChange }: Props) {
             <label
               key={opt.value}
               className={`seg-item${settings.stt === opt.value ? " is-sel" : ""}`}
-              style={{ cursor: "pointer" }}
+              style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 0 }}
             >
               <input
                 type="radio"
@@ -196,9 +279,15 @@ export function EngineSettings({ onChange }: Props) {
                 aria-checked={settings.stt === opt.value}
               />
               {opt.label}
+              {opt.free && <FreeDot />}
             </label>
           ))}
         </div>
+
+        {/* Free-path steering tip */}
+        <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--text-2)", lineHeight: 1.5 }}>
+          Local is free &amp; private. Groq is free in the cloud (no card). OpenAI is paid but most accurate.
+        </p>
 
         {/* Local model sub-row */}
         {settings.stt === "local" && (
@@ -239,7 +328,7 @@ export function EngineSettings({ onChange }: Props) {
             <label
               key={opt.value}
               className={`seg-item${settings.cleanup === opt.value ? " is-sel" : ""}`}
-              style={{ cursor: "pointer" }}
+              style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 0 }}
             >
               <input
                 type="radio"
@@ -251,6 +340,7 @@ export function EngineSettings({ onChange }: Props) {
                 aria-checked={settings.cleanup === opt.value}
               />
               {opt.label}
+              {opt.free && <FreeDot />}
             </label>
           ))}
         </div>
@@ -301,26 +391,31 @@ function ConnectBlock({
   verifyState,
 }: ConnectBlockProps) {
   const label = PROVIDER_LABEL[provider];
-  const keyPage = PROVIDER_KEY_PAGE[provider];
+  const info = PROVIDER_INFO[provider];
 
   return (
     <section className="card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       {/* Header row */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div className="section-label" style={{ marginBottom: 0 }}>Connect {label}</div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div className="section-label" style={{ marginBottom: 0 }}>Connect {label}</div>
+          <CostBadge tone={info.costTone} label={info.costLabel} />
+        </div>
         <button
           className="btn btn-ghost"
           style={{ fontSize: 12, padding: "3px 10px" }}
-          onClick={() => openUrl(keyPage)}
+          onClick={() => openUrl(info.keyPage)}
         >
           Get your API key ↗
         </button>
       </div>
 
-      {/* Inline step hint */}
-      <p style={{ margin: 0, fontSize: 12, color: "var(--text-2)", lineHeight: 1.5 }}>
-        1. Create a key &nbsp;&nbsp;2. Copy it &nbsp;&nbsp;3. Paste below
-      </p>
+      {/* Provider-specific step hint */}
+      <ol style={{ margin: 0, padding: "0 0 0 16px", fontSize: 12, color: "var(--text-2)", lineHeight: 1.6 }}>
+        {info.steps.map((step, i) => (
+          <li key={i}>{step}</li>
+        ))}
+      </ol>
 
       {/* Key input or saved state */}
       {keySet ? (

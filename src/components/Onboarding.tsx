@@ -118,7 +118,7 @@ export function Onboarding({ onReady }: { onReady: () => void }) {
 
         {/* Transcription — embedded EngineSettings, no border after */}
         <div style={{ paddingTop: 14 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
             {ready ? (
               <span className="status-icon-ok">
                 <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
@@ -132,6 +132,9 @@ export function Onboarding({ onReady }: { onReady: () => void }) {
               Transcription
             </span>
           </div>
+          <p style={{ margin: "0 0 12px", fontSize: 12, color: "var(--text-2)", lineHeight: 1.5 }}>
+            Pick how Murmur transcribes — Local and Groq are free; you can change this anytime.
+          </p>
           <EngineSettings onChange={refresh} />
         </div>
       </div>
