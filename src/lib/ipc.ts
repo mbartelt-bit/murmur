@@ -41,3 +41,15 @@ export const onDictationEmpty = (cb: () => void) =>
 /** Fires on any pipeline failure (capture/transcribe/insert). */
 export const onDictationError = (cb: (message: string) => void) =>
   listen<string>("dictation-error", (e) => cb(e.payload));
+
+// --- Hotkey commands ---
+
+/** Returns the current recording shortcut accelerator string (e.g. "control+alt+KeyD"). */
+export const getHotkey = (): Promise<string> => invoke<string>("get_hotkey");
+
+/**
+ * Sets a new recording shortcut.  Rejects with a user-facing message if the
+ * accelerator is invalid or the combo is already in use by another app.
+ */
+export const setHotkey = (accel: string): Promise<void> =>
+  invoke<void>("set_hotkey", { accelerator: accel });

@@ -85,6 +85,8 @@ pub fn run() {
             permissions::open_privacy_pane,
             model::model_ready,
             model::download_model,
+            hotkey::get_hotkey,
+            hotkey::set_hotkey,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Murmur");

@@ -1,6 +1,8 @@
+use std::str::FromStr;
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Emitter};
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+use tauri::{AppHandle, Emitter, Manager};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
+use tauri_plugin_store::StoreExt;
 
 /// How long (ms) the second tap must arrive after the first release to count as a double-tap.
 pub const DOUBLE_TAP_MS: u64 = 400;
@@ -80,7 +82,28 @@ pub trait PttSink: Send + Sync {
     fn stop(&self, app: &AppHandle);
 }
 
-/// Register `⌃⌥D` (Control+Option+D) as a global shortcut and wire it to `sink`.
+// ── managed state for dynamic shortcut ───────────────────────────────────────
+
+/// Managed state that holds the currently-active shortcut and the double-tap
+/// state machine.  Both are behind `Mutex` so commands can swap the shortcut
+/// at runtime while the plugin handler reads it concurrently.
+pub struct Hotkeys {
+    pub current: Mutex<Shortcut>,
+    pub tap: Mutex<DoubleTap>,
+}
+
+const DEFAULT_ACCELERATOR: &str = "Control+Alt+KeyD";
+
+/// Parse an accelerator string to a `Shortcut`, returning a user-facing error
+/// string on failure.
+pub fn parse_accelerator(accel: &str) -> Result<Shortcut, String> {
+    Shortcut::from_str(accel).map_err(|_| "Invalid shortcut".to_string())
+}
+
+/// Register the global shortcut plugin and wire it to `sink`.
+///
+/// The active shortcut is loaded from the store on startup (key `"hotkey"` in
+/// `"settings.json"`), defaulting to `Control+Alt+KeyD`.
 ///
 /// On `Pressed`:
 ///   - `StartHold` / `ToggleOn` → emit `"hud-state"` = `"recording"` + `sink.start()`
@@ -89,24 +112,45 @@ pub trait PttSink: Send + Sync {
 /// On `Released`:
 ///   - `Stop`   → `sink.stop()`
 ///   - `Ignore` → (latched, do nothing)
-///
-/// This function compiles but is NOT called until Task 13 wires the pipeline.
-#[allow(dead_code)]
 pub fn register(app: &AppHandle, sink: Arc<dyn PttSink>) -> tauri::Result<()> {
-    let shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyD);
-    let state = Arc::new(Mutex::new(DoubleTap::default()));
+    // ── load saved accelerator from store ────────────────────────────────────
+    let saved_accel: String = app
+        .store("settings.json")
+        .ok()
+        .and_then(|store| store.get("hotkey"))
+        .and_then(|v| v.as_str().map(|s| s.to_owned()))
+        .unwrap_or_else(|| DEFAULT_ACCELERATOR.to_owned());
+
+    let initial_shortcut =
+        parse_accelerator(&saved_accel).unwrap_or_else(|_| {
+            parse_accelerator(DEFAULT_ACCELERATOR).expect("default accelerator must parse")
+        });
+
+    // ── build managed Hotkeys state ──────────────────────────────────────────
+    let hotkeys = Arc::new(Hotkeys {
+        current: Mutex::new(initial_shortcut),
+        tap: Mutex::new(DoubleTap::default()),
+    });
+    app.manage(Arc::clone(&hotkeys));
+
+    // ── clone references for plugin handler closure ──────────────────────────
+    let hk = Arc::clone(&hotkeys);
     let sink2 = sink.clone();
 
     app.plugin(
         tauri_plugin_global_shortcut::Builder::new()
             .with_handler(move |app, sc, event| {
-                if sc != &shortcut {
+                // Compare against the LIVE shortcut, not the one captured at startup.
+                let current = hk.current.lock().unwrap();
+                if sc != &*current {
                     return;
                 }
-                let mut st = state.lock().unwrap();
+                drop(current); // release before locking tap
+
+                let mut tap = hk.tap.lock().unwrap();
                 let ts = now_ms(); // single, consistent timestamp per event
                 match event.state() {
-                    ShortcutState::Pressed => match st.on_press(ts) {
+                    ShortcutState::Pressed => match tap.on_press(ts) {
                         PressAction::StartHold | PressAction::ToggleOn => {
                             let _ = app.emit("hud-state", "recording");
                             sink2.start(app);
@@ -116,7 +160,7 @@ pub fn register(app: &AppHandle, sink: Arc<dyn PttSink>) -> tauri::Result<()> {
                         }
                     },
                     ShortcutState::Released => {
-                        if st.on_release(ts) == ReleaseAction::Stop {
+                        if tap.on_release(ts) == ReleaseAction::Stop {
                             sink2.stop(app);
                         }
                     }
@@ -124,14 +168,66 @@ pub fn register(app: &AppHandle, sink: Arc<dyn PttSink>) -> tauri::Result<()> {
             })
             .build(),
     )?;
+
     app.global_shortcut()
-        .register(shortcut)
+        .register(initial_shortcut)
         .map_err(|e| {
             tauri::Error::PluginInitialization(
                 "global-shortcut".to_string(),
                 e.to_string(),
             )
         })?;
+
+    Ok(())
+}
+
+// ── Tauri commands ────────────────────────────────────────────────────────────
+
+/// Returns the current hotkey accelerator string (e.g. "control+alt+KeyD").
+#[tauri::command]
+pub fn get_hotkey(app: AppHandle) -> String {
+    let state = app.state::<Arc<Hotkeys>>();
+    let sc = state.current.lock().unwrap();
+    sc.into_string()
+}
+
+/// Swaps the active recording shortcut to `accelerator`.
+///
+/// - Parses the new accelerator; returns `Err("Invalid shortcut")` on parse failure.
+/// - Unregisters the old shortcut; registers the new one.  If registration fails the
+///   old shortcut is re-registered and `Err("That combo is unavailable — try another.")`
+///   is returned.
+/// - On success, persists the new accelerator to `settings.json`.
+#[tauri::command]
+pub fn set_hotkey(app: AppHandle, accelerator: String) -> Result<(), String> {
+    let new_sc = parse_accelerator(&accelerator)?;
+
+    let state = app.state::<Arc<Hotkeys>>();
+    let mut current = state.current.lock().unwrap();
+    let old_sc = *current;
+
+    // Unregister old shortcut.
+    if let Err(e) = app.global_shortcut().unregister(old_sc) {
+        return Err(format!("Failed to unregister old shortcut: {e}"));
+    }
+
+    // Attempt to register new shortcut.
+    if let Err(_e) = app.global_shortcut().register(new_sc) {
+        // Rollback: re-register old shortcut (best effort).
+        let _ = app.global_shortcut().register(old_sc);
+        return Err("That combo is unavailable — try another.".to_string());
+    }
+
+    // Update live state.
+    *current = new_sc;
+    drop(current);
+
+    // Persist to store.
+    if let Ok(store) = app.store("settings.json") {
+        store.set("hotkey", serde_json::Value::String(new_sc.into_string()));
+        let _ = store.save();
+    }
+
     Ok(())
 }
 
@@ -184,5 +280,20 @@ mod tests {
         // Second press 600 ms after release (1700 - 1100 = 600 > 400) → StartHold
         assert_eq!(d.on_press(1700), PressAction::StartHold);
         assert_eq!(d.on_release(1800), ReleaseAction::Stop);
+    }
+
+    /// parse_accelerator round-trip: valid strings parse without error.
+    #[test]
+    fn parse_valid_accelerator() {
+        assert!(parse_accelerator("Control+Alt+KeyD").is_ok());
+        assert!(parse_accelerator("Super+Shift+KeyR").is_ok());
+        assert!(parse_accelerator("Control+Space").is_ok());
+    }
+
+    /// parse_accelerator rejects garbage strings.
+    #[test]
+    fn parse_invalid_accelerator() {
+        assert!(parse_accelerator("NotAKey+Blah").is_err());
+        assert!(parse_accelerator("").is_err());
     }
 }
