@@ -39,12 +39,14 @@ export function EngineSettings({ onChange }: Props) {
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [keyError, setKeyError] = useState<string | null>(null);
 
+  // refresh re-reads state only; it must NOT call onChange (that would fire on
+  // mount and feed back into onboarding's readiness poll). onChange fires only
+  // after an actual user mutation, below.
   const refresh = useCallback(async () => {
     const [s, mdl] = await Promise.all([getEngineSettings(), modelReady()]);
     setSettings(s);
     setLocalModelReady(mdl);
-    onChange?.();
-  }, [onChange]);
+  }, []);
 
   useEffect(() => {
     refresh();
@@ -52,18 +54,21 @@ export function EngineSettings({ onChange }: Props) {
 
   const handleSttChange = useCallback(
     async (value: string) => {
+      setKeyError(null); // clear any stale key error when switching provider
       await setSttEngine(value);
       await refresh();
+      onChange?.();
     },
-    [refresh]
+    [refresh, onChange]
   );
 
   const handleCleanupChange = useCallback(
     async (value: string) => {
       await setCleanupEngine(value);
       await refresh();
+      onChange?.();
     },
-    [refresh]
+    [refresh, onChange]
   );
 
   const handleSaveKey = useCallback(
@@ -78,13 +83,14 @@ export function EngineSettings({ onChange }: Props) {
         if (provider === "openai") setOpenaiInput("");
         else setGroqInput("");
         await refresh();
+        onChange?.();
       } catch (e) {
         setKeyError(e instanceof Error ? e.message : String(e));
       } finally {
         setSavingKey(null);
       }
     },
-    [openaiInput, groqInput, refresh]
+    [openaiInput, groqInput, refresh, onChange]
   );
 
   const handleRemoveKey = useCallback(
@@ -92,8 +98,9 @@ export function EngineSettings({ onChange }: Props) {
       const keyName = provider === "openai" ? "openai_api_key" : "groq_api_key";
       await deleteSecret(keyName);
       await refresh();
+      onChange?.();
     },
-    [refresh]
+    [refresh, onChange]
   );
 
   const handleDownloadModel = useCallback(async () => {
@@ -103,11 +110,12 @@ export function EngineSettings({ onChange }: Props) {
     try {
       await downloadModel();
       await refresh();
+      onChange?.();
     } finally {
       unlisten();
       setModelDownloading(false);
     }
-  }, [refresh]);
+  }, [refresh, onChange]);
 
   if (!settings) {
     return (
