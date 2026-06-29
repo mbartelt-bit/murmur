@@ -1,5 +1,6 @@
 mod audio;
 mod cleanup;
+mod engines;
 mod hotkey;
 mod insert;
 mod model;
@@ -89,6 +90,10 @@ pub fn run() {
             model::download_model,
             hotkey::get_hotkey,
             hotkey::set_hotkey,
+            engines::get_engine_settings,
+            engines::set_stt_engine,
+            engines::set_cleanup_engine,
+            engines::stt_ready,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Murmur");

@@ -3,7 +3,6 @@ use crate::{
     cleanup,
     hotkey::{self, PttSink},
     insert,
-    model,
     resample,
     stt,
     windows,
@@ -149,7 +148,7 @@ impl PttSink for Pipeline {
             };
             let audio16k = resample::resample_linear(&mono, sr, 16000);
 
-            let engine = stt::default_engine(model::model_path(&app));
+            let engine = stt::make_engine(&app);
             let raw = match engine.transcribe(&audio16k, "") {
                 Ok(t) => t,
                 Err(e) => {
@@ -160,7 +159,7 @@ impl PttSink for Pipeline {
                 }
             };
 
-            let clean = cleanup::default_cleanup().clean(&raw);
+            let clean = cleanup::make_engine(&app).clean(&raw);
             let result = DictationResult {
                 raw,
                 clean: clean.clone(),
