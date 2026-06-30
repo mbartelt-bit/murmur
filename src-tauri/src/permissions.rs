@@ -80,6 +80,23 @@ pub fn accessibility_trusted() -> bool {
     }
 }
 
+/// Like `accessibility_trusted`, but on the first call it triggers the macOS
+/// system prompt ("… would like to control this computer using accessibility
+/// features"). The side effect that matters: it registers the app in the
+/// Accessibility list so the user actually has a Murmur row to toggle on.
+/// Plain `application_is_trusted()` never adds the app to that list.
+#[tauri::command]
+pub fn prompt_accessibility() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        macos_accessibility_client::accessibility::application_is_trusted_with_prompt()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        false
+    }
+}
+
 #[tauri::command]
 pub fn open_privacy_pane(which: String) {
     #[cfg(target_os = "macos")]

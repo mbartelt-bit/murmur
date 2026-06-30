@@ -2,6 +2,13 @@ use arboard::{Clipboard, Error as ClipErr};
 use enigo::{Direction::{Click, Press, Release}, Enigo, Key, Keyboard, Settings};
 use std::{thread, time::Duration};
 
+// macOS virtual keycode for the V key (kVK_ANSI_V). We post the raw keycode
+// rather than `Key::Unicode('v')` on purpose: Unicode resolution goes through
+// the Text Input Source (TIS) APIs, which are MAIN-THREAD-ONLY and abort the
+// process (dispatch_assert_queue_fail / SIGTRAP) when called from the paste
+// worker thread. The raw keycode skips that lookup entirely.
+const KEYCODE_V: u32 = 0x09;
+
 fn cmd_v() -> Result<(), String> {
     let mut enigo = Enigo::new(&Settings::default()).map_err(|e| e.to_string())?;
     enigo.key(Key::Meta, Press).map_err(|e| e.to_string())?;
@@ -16,7 +23,7 @@ fn cmd_v() -> Result<(), String> {
     }
     let mut guard = MetaGuard(&mut enigo);
 
-    guard.0.key(Key::Unicode('v'), Click).map_err(|e| e.to_string())?;
+    guard.0.key(Key::Other(KEYCODE_V), Click).map_err(|e| e.to_string())?;
     Ok(())
 }
 

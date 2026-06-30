@@ -85,6 +85,7 @@ pub fn run() {
             permissions::mic_status,
             permissions::request_mic,
             permissions::accessibility_trusted,
+            permissions::prompt_accessibility,
             permissions::open_privacy_pane,
             permissions::open_url,
             model::model_ready,

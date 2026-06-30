@@ -3,6 +3,7 @@ import {
   micStatus,
   requestMic,
   accessibilityTrusted,
+  promptAccessibility,
   openPrivacyPane,
   sttReady,
 } from "../lib/ipc";
@@ -106,13 +107,30 @@ export function Onboarding({ onReady }: { onReady: () => void }) {
           ok={ax}
         >
           {!ax && (
-            <button
-              className="btn btn-ghost"
-              style={{ padding: "5px 12px", fontSize: 12 }}
-              onClick={() => openPrivacyPane("accessibility")}
-            >
-              Open Accessibility settings
-            </button>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
+              <button
+                className="btn btn-primary"
+                style={{ padding: "5px 12px", fontSize: 12 }}
+                onClick={async () => {
+                  // Fire ONLY the system prompt. It registers Murmur in the
+                  // Accessibility list and has its own "Open System Settings"
+                  // button. We must NOT also open the pane here — doing both
+                  // strands the dialog behind Settings, forcing the user to
+                  // hit Deny (which records a denial) just to close it.
+                  await promptAccessibility();
+                  refresh();
+                }}
+              >
+                Allow accessibility
+              </button>
+              <button
+                className="btn btn-ghost"
+                style={{ padding: "2px 8px", fontSize: 11 }}
+                onClick={() => openPrivacyPane("accessibility")}
+              >
+                Open Settings manually
+              </button>
+            </div>
           )}
         </OnboardRow>
 

@@ -1,24 +1,49 @@
 use keyring::{Entry, Error, Result};
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
 
 const SERVICE: &str = "com.murmur.app";
 
+// Process-lifetime cache of secret lookups. The onboarding UI polls key
+// presence every ~1.5s; without this, each poll hits the macOS Keychain and —
+// for an ad-hoc-signed build whose "Always Allow" grant doesn't persist —
+// re-triggers the access prompt in an endless loop. Caching means we touch the
+// Keychain at most once per account per launch (one prompt, then silent).
+// A failed read (e.g. the user denies) is NOT cached, so it can be retried.
+fn cache() -> &'static Mutex<HashMap<String, Option<String>>> {
+    static CACHE: OnceLock<Mutex<HashMap<String, Option<String>>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
 pub fn set(account: &str, value: &str) -> Result<()> {
-    Entry::new(SERVICE, account)?.set_password(value)
+    Entry::new(SERVICE, account)?.set_password(value)?;
+    cache()
+        .lock()
+        .unwrap()
+        .insert(account.to_owned(), Some(value.to_owned()));
+    Ok(())
 }
 
 pub fn get(account: &str) -> Result<Option<String>> {
-    match Entry::new(SERVICE, account)?.get_password() {
-        Ok(s) => Ok(Some(s)),
-        Err(Error::NoEntry) => Ok(None),
-        Err(e) => Err(e),
+    if let Some(v) = cache().lock().unwrap().get(account) {
+        return Ok(v.clone());
     }
+    let v = match Entry::new(SERVICE, account)?.get_password() {
+        Ok(s) => Some(s),
+        Err(Error::NoEntry) => None,
+        Err(e) => return Err(e),
+    };
+    cache().lock().unwrap().insert(account.to_owned(), v.clone());
+    Ok(v)
 }
 
 pub fn delete(account: &str) -> Result<()> {
-    match Entry::new(SERVICE, account)?.delete_credential() {
+    let res = match Entry::new(SERVICE, account)?.delete_credential() {
         Ok(()) | Err(Error::NoEntry) => Ok(()),
         Err(e) => Err(e),
-    }
+    };
+    cache().lock().unwrap().insert(account.to_owned(), None);
+    res
 }
 
 #[tauri::command]
