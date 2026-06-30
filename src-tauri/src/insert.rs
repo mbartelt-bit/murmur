@@ -38,8 +38,14 @@ pub fn insert_text(text: &str) -> Result<(), String> {
         Err(e) => return Err(e.to_string()),
     };
     clip.set_text(text.to_owned()).map_err(|e| e.to_string())?;
+    // Let the pasteboard propagate before synthesizing ⌘V — a large payload
+    // isn't instantly readable by the target app, so an immediate paste can
+    // land empty.
+    thread::sleep(Duration::from_millis(40));
     cmd_v()?;
-    thread::sleep(Duration::from_millis(150)); // let target app read before restore
+    // Give the target app time to consume the paste before we restore the
+    // previous clipboard. 150ms was too tight for longer transcripts.
+    thread::sleep(Duration::from_millis(300));
     match prev {
         Some(p) => {
             let _ = clip.set_text(p);

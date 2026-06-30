@@ -14,6 +14,14 @@ function IconCopy() {
   );
 }
 
+function IconCheck() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <path d="M2.5 7.5l3 3 6-7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function IconTrash() {
   return (
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
@@ -24,7 +32,14 @@ function IconTrash() {
 
 export function HistoryList() {
   const [rows, setRows] = useState<Transcript[]>([]);
+  const [copiedId, setCopiedId] = useState<number | null>(null);
   const refresh = useCallback(async () => setRows(await listTranscripts(50)), []);
+
+  const copy = useCallback(async (id: number, text: string) => {
+    await writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 1500);
+  }, []);
 
   useEffect(() => {
     refresh();
@@ -90,11 +105,12 @@ export function HistoryList() {
               <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                 <button
                   className="icon-btn"
-                  onClick={() => writeText(r.clean_text)}
-                  title="Copy"
-                  aria-label="Copy"
+                  onClick={() => copy(r.id, r.clean_text)}
+                  title={copiedId === r.id ? "Copied" : "Copy"}
+                  aria-label={copiedId === r.id ? "Copied" : "Copy"}
+                  style={copiedId === r.id ? { color: "var(--ok, #6ee7a8)" } : undefined}
                 >
-                  <IconCopy />
+                  {copiedId === r.id ? <IconCheck /> : <IconCopy />}
                 </button>
                 <button
                   className="icon-btn icon-btn-danger"
