@@ -80,6 +80,42 @@ pub fn accessibility_trusted() -> bool {
     }
 }
 
+// Input Monitoring (needed for the fn-key event tap). These are the documented
+// CoreGraphics gates for a listen-only event tap.
+#[cfg(target_os = "macos")]
+#[link(name = "CoreGraphics", kind = "framework")]
+extern "C" {
+    fn CGPreflightListenEventAccess() -> bool;
+    fn CGRequestListenEventAccess() -> bool;
+}
+
+/// True when the app already has Input Monitoring access for listening to events.
+#[tauri::command]
+pub fn input_monitoring_trusted() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        unsafe { CGPreflightListenEventAccess() }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        false
+    }
+}
+
+/// Trigger the macOS Input Monitoring prompt (and register the app in that
+/// list). Returns the current grant status.
+#[tauri::command]
+pub fn request_input_monitoring() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        unsafe { CGRequestListenEventAccess() }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        false
+    }
+}
+
 /// Like `accessibility_trusted`, but on the first call it triggers the macOS
 /// system prompt ("… would like to control this computer using accessibility
 /// features"). The side effect that matters: it registers the app in the
@@ -104,6 +140,9 @@ pub fn open_privacy_pane(which: String) {
         let url = match which.as_str() {
             "accessibility" => {
                 "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+            }
+            "input-monitoring" => {
+                "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
             }
             _ => "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone",
         };

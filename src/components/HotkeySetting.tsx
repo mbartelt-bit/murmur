@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { getHotkey, setHotkey } from "../lib/ipc";
+import { getHotkey, setHotkey, inputMonitoringTrusted, openPrivacyPane } from "../lib/ipc";
 
 // ── Accelerator helpers ───────────────────────────────────────────────────────
 
@@ -92,13 +92,17 @@ export function HotkeySetting() {
   const [accel, setAccel] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [fnReady, setFnReady] = useState(false);
   const listenerRef = useRef<((e: KeyboardEvent) => void) | null>(null);
 
-  // Load current hotkey on mount.
+  // Load current hotkey + fn-key (Input Monitoring) status on mount.
   useEffect(() => {
     getHotkey()
       .then(setAccel)
       .catch(() => setAccel("control+alt+KeyD"));
+    inputMonitoringTrusted()
+      .then(setFnReady)
+      .catch(() => setFnReady(false));
   }, []);
 
   // Attach/detach capture listener when `capturing` changes.
@@ -160,7 +164,40 @@ export function HotkeySetting() {
 
   return (
     <div>
-      <div className="section-label">Recording shortcut</div>
+      <div className="section-label">Push to talk</div>
+
+      {/* Primary trigger: the fn (globe) key — always on, handled by the
+          event-tap listener. It can't be "recorded" like a combo, so it gets
+          its own row instead of living in the capture box below. */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span>
+            Hold <kbd className="kbd">🌐 fn</kbd> and speak
+          </span>
+          {fnReady ? (
+            <span className="badge-ok" style={{ fontSize: 11 }}>Active</span>
+          ) : (
+            <span style={{ fontSize: 11, color: "var(--danger)" }}>Needs Input Monitoring</span>
+          )}
+        </div>
+        {!fnReady && (
+          <button
+            className="btn btn-ghost"
+            style={{ padding: "4px 10px", fontSize: 12 }}
+            onClick={() => openPrivacyPane("input-monitoring")}
+          >
+            Enable in Settings
+          </button>
+        )}
+      </div>
+      <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--text-2)", lineHeight: 1.5 }}>
+        No setup needed — just hold the fn (🌐) key. If it pops the emoji or
+        input-source menu, set <em>System Settings → Keyboard → “Press 🌐 key
+        to” → Do Nothing</em>.
+      </p>
+
+      {/* Alternative trigger: a keyboard combo. */}
+      <div className="section-label" style={{ marginTop: 18 }}>Or a keyboard shortcut</div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {capturing ? (
@@ -189,6 +226,10 @@ export function HotkeySetting() {
           </button>
         )}
       </div>
+      <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--text-2)", lineHeight: 1.5 }}>
+        Must include a modifier (⌃⌥⇧⌘). Bare keys like fn can’t be recorded
+        here — use the fn key above for a no-modifier trigger.
+      </p>
     </div>
   );
 }

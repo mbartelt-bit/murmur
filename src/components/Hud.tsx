@@ -42,6 +42,8 @@ export function Hud() {
 function RecordingDot() {
   return (
     <div
+      role="img"
+      aria-label="Recording"
       style={{
         position: "relative",
         display: "flex",
@@ -81,6 +83,8 @@ function RecordingDot() {
 function SquiggleEq() {
   return (
     <div
+      role="img"
+      aria-label="Transcribing"
       style={{
         display: "flex",
         alignItems: "center",

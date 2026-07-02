@@ -6,6 +6,9 @@ vi.mock("../lib/ipc", () => ({
   micStatus: () => invoke("mic_status"),
   requestMic: () => invoke("request_mic"),
   accessibilityTrusted: () => invoke("accessibility_trusted"),
+  promptAccessibility: () => invoke("prompt_accessibility"),
+  inputMonitoringTrusted: () => invoke("input_monitoring_trusted"),
+  requestInputMonitoring: () => invoke("request_input_monitoring"),
   openPrivacyPane: (w: string) => invoke("open_privacy_pane", w),
   // Legacy model commands (still exported from ipc, used by EngineSettings for local path)
   modelReady: () => invoke("model_ready"),

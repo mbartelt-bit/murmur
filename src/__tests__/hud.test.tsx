@@ -15,6 +15,6 @@ describe("Hud", () => {
   it("shows Recording when state event fires", async () => {
     render(<Hud />);
     stateCb("recording");
-    expect(await screen.findByText(/recording/i)).toBeTruthy();
+    expect(await screen.findByLabelText(/recording/i)).toBeTruthy();
   });
 });

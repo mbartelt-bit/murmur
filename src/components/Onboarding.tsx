@@ -4,6 +4,8 @@ import {
   requestMic,
   accessibilityTrusted,
   promptAccessibility,
+  inputMonitoringTrusted,
+  requestInputMonitoring,
   openPrivacyPane,
   sttReady,
 } from "../lib/ipc";
@@ -12,18 +14,21 @@ import { EngineSettings } from "./EngineSettings";
 export function Onboarding({ onReady }: { onReady: () => void }) {
   const [mic, setMic] = useState<string>("notDetermined");
   const [ax, setAx] = useState<boolean>(false);
+  const [im, setIm] = useState<boolean>(false);
   const [ready, setReady] = useState<boolean>(false);
 
   const refresh = useCallback(async () => {
-    const [m, a, r] = await Promise.all([
+    const [m, a, i, r] = await Promise.all([
       micStatus(),
       accessibilityTrusted(),
+      inputMonitoringTrusted(),
       sttReady(),
     ]);
     setMic(m);
     setAx(a);
+    setIm(i);
     setReady(r);
-    if (m === "authorized" && a && r) onReady();
+    if (m === "authorized" && a && i && r) onReady();
   }, [onReady]);
 
   useEffect(() => {
@@ -131,6 +136,28 @@ export function Onboarding({ onReady }: { onReady: () => void }) {
                 Open Settings manually
               </button>
             </div>
+          )}
+        </OnboardRow>
+
+        {/* Input Monitoring — needed for the fn (globe) push-to-talk key */}
+        <OnboardRow
+          label="Input Monitoring"
+          hint="Lets you hold the fn (globe) key to dictate. Relaunch Murmur after granting."
+          ok={im}
+        >
+          {!im && (
+            <button
+              className="btn btn-primary"
+              style={{ padding: "5px 12px", fontSize: 12 }}
+              onClick={async () => {
+                // Fires the system prompt and registers Murmur in the Input
+                // Monitoring list; its own dialog links to System Settings.
+                await requestInputMonitoring();
+                refresh();
+              }}
+            >
+              Allow fn key
+            </button>
           )}
         </OnboardRow>
 

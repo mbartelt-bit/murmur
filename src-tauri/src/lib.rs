@@ -7,6 +7,7 @@ mod model;
 mod permissions;
 mod pipeline;
 mod provider;
+mod ptt_key;
 mod resample;
 mod secrets;
 mod stt;
@@ -86,6 +87,8 @@ pub fn run() {
             permissions::request_mic,
             permissions::accessibility_trusted,
             permissions::prompt_accessibility,
+            permissions::input_monitoring_trusted,
+            permissions::request_input_monitoring,
             permissions::open_privacy_pane,
             permissions::open_url,
             model::model_ready,

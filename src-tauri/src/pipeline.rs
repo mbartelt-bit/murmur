@@ -189,6 +189,8 @@ impl PttSink for Pipeline {
 
 pub fn init(app: &AppHandle) {
     let pipeline: Arc<dyn PttSink> = Arc::new(Pipeline::new());
+    // fn-key (globe) push-to-talk listener, alongside the ⌃⌥D global shortcut.
+    crate::ptt_key::start(app.clone(), pipeline.clone());
     if let Err(e) = hotkey::register(app, pipeline) {
         eprintln!("hotkey registration failed: {e}");
     }

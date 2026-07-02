@@ -8,6 +8,8 @@ const mockSetHotkey = vi.fn(async (_accel?: string) => {});
 vi.mock("../lib/ipc", () => ({
   getHotkey: () => mockGetHotkey(),
   setHotkey: (accel: string) => mockSetHotkey(accel),
+  inputMonitoringTrusted: () => Promise.resolve(false),
+  openPrivacyPane: () => {},
 }));
 
 import {

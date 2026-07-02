@@ -5,7 +5,9 @@ export const micStatus = () => invoke<string>("mic_status");
 export const requestMic = () => invoke<boolean>("request_mic");
 export const accessibilityTrusted = () => invoke<boolean>("accessibility_trusted");
 export const promptAccessibility = () => invoke<boolean>("prompt_accessibility");
-export const openPrivacyPane = (which: "mic" | "accessibility") =>
+export const inputMonitoringTrusted = () => invoke<boolean>("input_monitoring_trusted");
+export const requestInputMonitoring = () => invoke<boolean>("request_input_monitoring");
+export const openPrivacyPane = (which: "mic" | "accessibility" | "input-monitoring") =>
   invoke<void>("open_privacy_pane", { which });
 
 export const modelReady = () => invoke<boolean>("model_ready");
