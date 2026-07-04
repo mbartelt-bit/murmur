@@ -8,6 +8,7 @@ import {
   requestInputMonitoring,
   openPrivacyPane,
   sttReady,
+  restartApp,
 } from "../lib/ipc";
 import { EngineSettings } from "./EngineSettings";
 
@@ -182,6 +183,21 @@ export function Onboarding({ onReady }: { onReady: () => void }) {
           </p>
           <EngineSettings onChange={refresh} />
         </div>
+      </div>
+
+      {/* Restart — permission grants are re-read only at launch, so a relaunch
+          is the reliable way to pick up a grant made in System Settings. */}
+      <div style={{ marginTop: 16, textAlign: "center", maxWidth: 400 }}>
+        <button
+          className="btn btn-ghost"
+          style={{ padding: "5px 12px", fontSize: 12 }}
+          onClick={() => restartApp()}
+        >
+          Restart Murmur
+        </button>
+        <p style={{ margin: "6px 0 0", fontSize: 11, color: "var(--text-2)" }}>
+          Granted a permission in System Settings but it still shows pending? Restart to apply it.
+        </p>
       </div>
     </div>
   );

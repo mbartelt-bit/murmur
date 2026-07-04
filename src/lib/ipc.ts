@@ -10,6 +10,9 @@ export const requestInputMonitoring = () => invoke<boolean>("request_input_monit
 export const openPrivacyPane = (which: "mic" | "accessibility" | "input-monitoring") =>
   invoke<void>("open_privacy_pane", { which });
 
+/** Relaunch Murmur so newly-granted permissions are picked up. Does not resolve. */
+export const restartApp = () => invoke<never>("restart_app");
+
 export const modelReady = () => invoke<boolean>("model_ready");
 export const downloadModel = () => invoke<void>("download_model");
 export const onModelProgress = (cb: (p: number) => void) =>

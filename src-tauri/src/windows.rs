@@ -1,5 +1,14 @@
 use tauri::{AppHandle, LogicalPosition, Manager, WebviewWindow};
 
+/// Relaunch the app. Most permission grants (Accessibility, Input Monitoring,
+/// mic ACLs) are only re-read at launch, so a restart is the reliable way to
+/// pick them up after the user toggles them in System Settings. `restart()`
+/// never returns.
+#[tauri::command]
+pub fn restart_app(app: AppHandle) {
+    app.restart();
+}
+
 pub fn show_settings(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("settings") {
         let _ = w.show();

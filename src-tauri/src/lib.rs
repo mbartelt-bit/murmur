@@ -100,6 +100,7 @@ pub fn run() {
             engines::set_cleanup_engine,
             engines::stt_ready,
             engines::verify_provider,
+            windows::restart_app,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Murmur");
