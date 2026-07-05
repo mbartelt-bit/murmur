@@ -147,18 +147,30 @@ export function Onboarding({ onReady }: { onReady: () => void }) {
           ok={im}
         >
           {!im && (
-            <button
-              className="btn btn-primary"
-              style={{ padding: "5px 12px", fontSize: 12 }}
-              onClick={async () => {
-                // Fires the system prompt and registers Murmur in the Input
-                // Monitoring list; its own dialog links to System Settings.
-                await requestInputMonitoring();
-                refresh();
-              }}
-            >
-              Allow fn key
-            </button>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
+              <button
+                className="btn btn-primary"
+                style={{ padding: "5px 12px", fontSize: 12 }}
+                onClick={async () => {
+                  // Fires the system prompt and registers Murmur in the Input
+                  // Monitoring list; its own dialog links to System Settings.
+                  // macOS only prompts while the status is notDetermined — if
+                  // it was previously denied, this is a silent no-op, so the
+                  // manual-Settings fallback below is the escape hatch.
+                  await requestInputMonitoring();
+                  refresh();
+                }}
+              >
+                Allow fn key
+              </button>
+              <button
+                className="btn btn-ghost"
+                style={{ padding: "2px 8px", fontSize: 11 }}
+                onClick={() => openPrivacyPane("input-monitoring")}
+              >
+                Open Settings manually
+              </button>
+            </div>
           )}
         </OnboardRow>
 
