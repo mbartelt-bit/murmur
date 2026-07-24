@@ -76,6 +76,33 @@ pub fn run() {
                 })
                 .build(app)?;
 
+            // Keep the settings window reachable: hide (don't destroy) on
+            // close so the tray can always reopen it, and show it on launch so
+            // the user is never locked out of the UI.
+            if let Some(w) = app.get_webview_window("settings") {
+                let wc = w.clone();
+                w.on_window_event(move |e| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = e {
+                        api.prevent_close();
+                        let _ = wc.hide();
+                    }
+                });
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+
+            // Startup diagnostic — write the live permission state to a file so
+            // trigger/permission problems can be read directly.
+            if let Ok(dir) = app.path().app_data_dir() {
+                let diag = format!(
+                    "startup accessibility={} input_monitoring={} mic={}\n",
+                    permissions::accessibility_trusted(),
+                    permissions::input_monitoring_trusted(),
+                    permissions::mic_status(),
+                );
+                let _ = std::fs::write(dir.join("diag.log"), diag);
+            }
+
             pipeline::init(app.handle());
             Ok(())
         })
