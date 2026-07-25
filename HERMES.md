@@ -41,18 +41,19 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 . "$HOME/.cargo/env"
 ```
 
-## 2. Repo access + clone
+## 2. Clone
 
-The repo is **private**: `https://github.com/mbartelt-bit/murmur`. Her GitHub account has been (or
-will be) invited as a collaborator — she must accept the invite (email from GitHub, or
-github.com/notifications) before cloning works.
+The repo is **public**: `https://github.com/mbartelt-bit/murmur`. No GitHub account or auth is
+needed to clone and build:
 
 ```bash
-gh auth login          # [HUMAN] — HER GitHub account, browser flow
-gh repo clone mbartelt-bit/murmur ~/murmur
+git clone https://github.com/mbartelt-bit/murmur.git ~/murmur
 cd ~/murmur
 npm ci
 ```
+
+(A GitHub account is only needed if she later wants to push changes back — then `gh auth login`
+with her account and ask Matt for collaborator access, or fork and PR.)
 
 ## 3. Sanity check the checkout (optional but cheap)
 
