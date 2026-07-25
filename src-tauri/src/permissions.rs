@@ -52,7 +52,10 @@ pub fn mic_status() -> String {
     }
     #[cfg(not(target_os = "macos"))]
     {
-        "notDetermined".to_string()
+        // Off macOS there is no per-app mic authorization API for desktop apps;
+        // capture either works or the OS-level privacy toggle silently blanks
+        // it (surfaced via diag.log; real privacy-toggle check = port plan W1).
+        "authorized".to_string()
     }
 }
 
@@ -64,7 +67,7 @@ pub async fn request_mic() -> bool {
     }
     #[cfg(not(target_os = "macos"))]
     {
-        false
+        true
     }
 }
 
@@ -76,7 +79,9 @@ pub fn accessibility_trusted() -> bool {
     }
     #[cfg(not(target_os = "macos"))]
     {
-        false
+        // No Accessibility grant exists off macOS; synthetic input needs no
+        // permission.
+        true
     }
 }
 
@@ -98,7 +103,8 @@ pub fn input_monitoring_trusted() -> bool {
     }
     #[cfg(not(target_os = "macos"))]
     {
-        false
+        // No Input Monitoring concept off macOS; nothing to grant.
+        true
     }
 }
 
@@ -112,7 +118,7 @@ pub fn request_input_monitoring() -> bool {
     }
     #[cfg(not(target_os = "macos"))]
     {
-        false
+        true
     }
 }
 
@@ -129,7 +135,7 @@ pub fn prompt_accessibility() -> bool {
     }
     #[cfg(not(target_os = "macos"))]
     {
-        false
+        true
     }
 }
 
@@ -148,14 +154,23 @@ pub fn open_privacy_pane(which: String) {
         };
         let _ = std::process::Command::new("open").arg(url).spawn();
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    {
+        // Only the mic pane has a Windows equivalent; all three requests route
+        // there.
+        let _ = which;
+        let _ = std::process::Command::new("cmd")
+            .args(["/C", "start", "ms-settings:privacy-microphone"])
+            .spawn();
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         let _ = which;
     }
 }
 
 /// Open an arbitrary HTTPS URL in the default browser.
-/// On macOS uses `open`; no-op on other platforms.
+/// macOS uses `open`; Windows uses `rundll32`; no-op elsewhere.
 #[tauri::command]
 pub fn open_url(url: String) {
     // Only ever open https:// links (provider key pages) — never file:// or app schemes.
@@ -166,7 +181,15 @@ pub fn open_url(url: String) {
     {
         let _ = std::process::Command::new("open").arg(&url).spawn();
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    {
+        // rundll32 hands the URL straight to the default browser with no
+        // cmd/start quoting pitfalls.
+        let _ = std::process::Command::new("rundll32")
+            .args(["url.dll,FileProtocolHandler", &url])
+            .spawn();
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         let _ = url;
     }
