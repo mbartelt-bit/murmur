@@ -78,6 +78,31 @@ fresh clone builds without XcodeGen), plus the Gradle wrapper.
 
 ---
 
+## iOS app (MM1 landed 2026-09-04) — branch `feat/mobile-mm1`, PR #3 (stacked on #2)
+
+The iOS containing app is complete on the simulator: onboarding, home, settings, history, and
+the native recorder (mic → `SpeechAnalyzer` on iOS 26 / `SFSpeechRecognizer` before that, or
+Groq/OpenAI through `murmur-core` → cleanup → history → clipboard + App Group handoff).
+131 XCTest cases, all with fakes. Plan: `docs/superpowers/plans/2026-09-04-murmur-mobile-mm1.md`.
+Per-file map and the device checklist: `apple/README.md`.
+
+Facts a new session needs:
+- **Recording cannot run on the simulator** — `AVAudioEngine.inputNode` aborts in AudioToolbox
+  (`AURemoteIO::Initialize`) with no host mic. Unit tests cover the recorder's phases; the
+  first real recording is Matt's device checklist.
+- **`$(AppIdentifierPrefix)` expands on simulator builds too**, so `Keychain.defaultAccessGroup`
+  is `X9PU63GUAN.com.murmur.app` everywhere; the simulator keychain just doesn't enforce it.
+- The cloud → on-device retry replays the same audio (`ChunkTape` in `DictationPipeline.swift`)
+  — the user never repeats themselves after a network failure.
+- `Handoff` (App Group) is the contract the MM2 keyboard consumes: `pending{session}` in,
+  `result{session, raw, clean}` out, insert-once, 10-minute expiry.
+- What MM2 builds next: the keyboard extension, the Dictate App Intent + Control Center
+  button, the onboarding steps for enabling the keyboard, crash-safe recording, and the
+  TestFlight script. Plan: `docs/superpowers/plans/2026-09-04-murmur-mobile-mm2.md`.
+  Android is MM3: `docs/superpowers/plans/2026-09-04-murmur-mobile-mm3.md`.
+
+---
+
 ## What Murmur is
 A macOS menubar voice-dictation app (a Wispr Flow alternative). Hold a hotkey, speak, and it
 transcribes (local Whisper **or** cloud), cleans the text up, and pastes it at your cursor. No Dock

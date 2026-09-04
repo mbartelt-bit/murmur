@@ -3,16 +3,13 @@ import XCTest
 @testable import Murmur
 import MurmurShared
 
-/// These run on the simulator, so they exercise the real xcframework: if the Rust
-/// core, the UniFFI bindings, or the linkage were broken, both cases would fail.
+/// One end-to-end call through the Rust core, on the simulator, against the real
+/// xcframework: if `murmur-core`, the UniFFI bindings or the linkage were broken, this is the
+/// test that would say so before any of the view-model suites got confusing.
 final class CoreClientTests: XCTestCase {
-    func testKeyPageIsGroqConsole() {
-        XCTAssertEqual(CoreClient.groqKeyPage(), "https://console.groq.com/keys")
-    }
-
     func testRulesCleanupThroughFFI() async {
-        let r = await CoreClient.cleanLocally("um hello world")
-        XCTAssertEqual(r.clean, "Hello world.")
-        XCTAssertFalse(r.usedCloud)
+        let result = await CoreClient.cleanLocally("um hello world")
+        XCTAssertEqual(result.clean, "Hello world.")
+        XCTAssertFalse(result.usedCloud)
     }
 }

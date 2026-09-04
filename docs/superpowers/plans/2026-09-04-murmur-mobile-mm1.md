@@ -30,7 +30,7 @@ Plus the device gates (only Matt can run these, listed in Task 6).
 
 ---
 
-## Task 1 — Shared foundations: App Group, settings, keychain, handoff
+## Task 1 ✅ `0e209fe` — Shared foundations: App Group, settings, keychain, handoff
 
 **Files (create):**
 - `apple/MurmurShared/Sources/MurmurShared/AppGroup.swift`
@@ -96,7 +96,7 @@ public enum Handoff {   // App Group UserDefaults keys "handoff.pending" / "hand
 
 ---
 
-## Task 2 — History store (GRDB)
+## Task 2 ✅ `7bdd34a` — History store (GRDB)
 
 **Files (create):** `apple/MurmurShared/Sources/MurmurShared/HistoryStore.swift`, `apple/MurmurTests/HistoryStoreTests.swift`.
 
@@ -121,7 +121,7 @@ Migration `v1`: table `transcripts(id INTEGER PRIMARY KEY AUTOINCREMENT, raw_tex
 
 ---
 
-## Task 3 — Audio capture, local speech engines, and the dictation pipeline
+## Task 3 ✅ `6213643` — Audio capture, local speech engines, and the dictation pipeline
 
 **Files (create):**
 - `apple/MurmurShared/Sources/MurmurShared/Audio/AudioCapture.swift`
@@ -176,7 +176,7 @@ Implementation notes for the implementer: `AnalyzerSpeechEngine` follows the iOS
 
 ---
 
-## Task 4 — Recorder screen + URL entry point
+## Task 4 ✅ `2a717ba` — Recorder screen + URL entry point
 
 **Files (create):** `apple/Murmur/Recorder/RecorderViewModel.swift`, `apple/Murmur/Recorder/RecorderView.swift`, `apple/Murmur/Recorder/RecordingIndicator.swift` (pulsing dot driven by level; translucent squiggle while transcribing — port the shapes from `src/components/Hud.tsx`), `apple/Murmur/AppState.swift`, `apple/MurmurTests/RecorderViewModelTests.swift`.
 **Modify:** `apple/Murmur/MurmurApp.swift` — `@StateObject var app = AppState()`; `.onOpenURL { app.handle(url) }`; `.fullScreenCover(item: $app.activeDictation) { RecorderView(request: $0) }`.
@@ -208,7 +208,7 @@ final class AppState: ObservableObject {
 
 ---
 
-## Task 5 — Onboarding, Home, Settings, History
+## Task 5 ✅ `3a78922` — Onboarding, Home, Settings, History
 
 **Files (create):** `apple/Murmur/Onboarding/{OnboardingViewModel,OnboardingView}.swift`, `apple/Murmur/Home/{HomeViewModel,HomeView}.swift` (replace the MM0 shell), `apple/Murmur/Settings/{EngineSettingsViewModel,SettingsView,ProviderKeyView}.swift`, `apple/Murmur/History/{HistoryViewModel,HistoryView}.swift`, `apple/Murmur/RootView.swift` (TabView: Home · History · Settings; shows `OnboardingView` until `settings.onboardingComplete`), `apple/Murmur/Components/{StatusChip,Card}.swift`, `apple/MurmurTests/{OnboardingViewModelTests,EngineSettingsViewModelTests,HistoryViewModelTests}.swift`.
 **Delete:** the MM0 `HomeView` body and `CoreClientTests` are superseded — keep `CoreClient` (used by settings) and keep one FFI smoke test.
@@ -242,7 +242,7 @@ UI copy is the desktop's, reused verbatim: engine segment labels "Local · Free"
 
 ---
 
-## Task 6 — Device verification + docs
+## Task 6 ✅ (docs in `apple/README.md` + `docs/HANDOFF.md`; device gates pending Matt) — Device verification + docs
 
 **Files (modify):** `apple/README.md` (screens, how to run on a device: select the team in Xcode once, `xcodebuild -destination 'platform=iOS,name=iPhone'` needs the phone unlocked and trusted), `docs/HANDOFF.md` (MM1 section: what works, the device gates below), `docs/superpowers/plans/2026-09-04-murmur-mobile-mm1.md` (tick the tasks).
 

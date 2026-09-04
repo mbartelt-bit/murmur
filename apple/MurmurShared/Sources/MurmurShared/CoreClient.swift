@@ -6,9 +6,10 @@ import MurmurCore
 /// `crates/murmur-core`; the indirection exists so views and view models never import
 /// the generated bindings directly and so the FFI can be exercised from unit tests.
 public enum CoreClient {
-    /// Where a user goes to mint a Groq API key.
-    public static func groqKeyPage() -> String {
-        keyPageUrl(provider: .groq)
+    /// Where a user goes to mint an API key for `provider`. The core owns both URLs so the
+    /// Mac and the phone can never point at different pages.
+    public static func keyPage(for provider: ProviderId) -> String {
+        keyPageUrl(provider: provider.core)
     }
 
     /// Rules-only cleanup: no network, no key, and it never fails.
