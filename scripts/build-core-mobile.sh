@@ -136,6 +136,12 @@ build_ios() {
     exit 1
   }
 
+  # Pin the deployment target for the C/asm objects (ring, BoringSSL) that the `cc`
+  # crate compiles, or they inherit the SDK's own version and every app link emits
+  # "object file was built for newer iOS version than being linked" warnings.
+  # 17.0 matches apple/project.yml's deploymentTarget.
+  export IPHONEOS_DEPLOYMENT_TARGET=17.0
+
   local triple
   for triple in "$device_triple" "$sim_triple"; do
     echo "--> cargo build --target $triple"
