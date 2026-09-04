@@ -130,3 +130,28 @@ something an emulator can show.
 Everything is in `src/debug/java/com/murmur/app/debug/`; `src/release/java/` holds a
 `DebugHooks` twin whose two methods do nothing, so neither the flag, nor the fake session,
 nor the WAV exists in a release build.
+
+## What the app does (MM3)
+
+| Piece | Where | What |
+|---|---|---|
+| Input method | `app/src/main/java/com/murmur/app/ime/` | The Murmur voice keyboard. Opens listening (auto-listen), transcribes on-device (Android `SpeechRecognizer`) or through Groq/OpenAI via `murmur-core`, cleans, writes history, commits the text into the focused field, and returns to the previous keyboard. Globe / delete / space / return; no letter keys by design. |
+| Pipeline | `engine/DictationPipeline.kt` | Same five rules as iOS. Android difference: the on-device recognizer records itself and cannot take a buffer, so a cloud failure offers **Try on device** instead of replaying silently. |
+| Audio | `audio/` | `AudioRecorder` (16 kHz mono, cloud path only), `SilenceDetector`. |
+| Data | `data/` | DataStore settings, `EncryptedSharedPreferences` secrets, Room history (same `transcripts` schema as the desktop). |
+| Screens | `ui/` | Onboarding (mic → engine → keyboard → test), Home, Settings, History, and the in-app recorder that reuses `ImeController`. |
+
+Everything the IME does is unit-tested with fakes (`ImeControllerTest`); the recorder and the real recognizer are exercised on the emulator/device.
+
+### Debug-only screenshot mode
+
+`adb shell am start -n com.murmur.app/.MainActivity -e murmurScreen home|history|settings|onboarding|recorder` opens a screen and seeds two history rows the first time. Compiled out of release.
+
+### Device checklist (MM3)
+
+1. Fresh install → onboarding: the mic prompt grants; Local shows ready (or Google's offline pack downloads); keyboard settings open and Murmur appears; enabling it flips the check.
+2. In Messages: tap the field → keyboard switcher → Murmur → it starts listening immediately → speak → auto-stops → the text is committed with a trailing space → Gboard is back within half a second.
+3. Settings → turn off auto-listen and return-to-keyboard → the keyboard waits for the mic tap and stays after committing; the globe returns to Gboard.
+4. Settings → Groq key: "Get your API key ↗" opens the browser; paste → "✓ Connected"; Transcription = Groq → dictation works; airplane mode → **Try on device** appears and works.
+5. Revoke the mic permission in system settings → the keyboard shows "Open Murmur to allow the microphone" → the button opens the app at the mic step.
+6. Rotate the phone while listening — the keyboard survives and the dictation completes.

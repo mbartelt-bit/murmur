@@ -133,6 +133,33 @@ Facts a new session needs:
 
 ---
 
+## Android app + voice keyboard (MM3 landed 2026-09-04) — branch `feat/mobile-mm3`, PR #5 (stacked on #4)
+
+Dictate into any app on Android. Landed: DataStore settings, EncryptedSharedPreferences secrets,
+Room history, the `DictationPipeline` (same five rules as iOS), `AudioRecord` capture + on-device
+`SpeechRecognizer` and cloud engines, the **Murmur input method** (`ime/`: auto-listen, commit,
+return to the previous keyboard), Compose onboarding/home/settings/history + in-app recorder,
+release signing + R8 rules, a debug-only fake audio session for emulator runs, and
+`scripts/android-play-upload.sh` + `scripts/play-upload.mjs`. 99 JVM tests; verified on the
+`murmur35` emulator against Google Messages and the Settings app. Plan:
+`docs/superpowers/plans/2026-09-04-murmur-mobile-mm3.md`; details + device checklist: `android/README.md`.
+
+Facts a new session needs:
+- **Android's on-device recognizer records itself** and cannot take a buffer, so the cloud→local
+  fallback is an explicit "Try on device" button, not a silent replay (`DictationPipeline.kt`).
+- **Compose inside an `InputMethodService`** needs the service to be the lifecycle / view-model /
+  saved-state owner and to set those on the decor view (`ComposeInputView.kt`).
+- **Auto-listen fires once per appearance** (`commitText` restarts the input session, which would
+  otherwise re-trigger it).
+- **The Play dry run authenticates with the ARKHE service account but gets 403** until Matt creates
+  the Play app for `com.murmur.app` and grants that account Release manager on it.
+- **Robolectric has no AndroidKeyStore**, hence `EncryptedSecretStore`'s internal prefs-injecting
+  constructor for tests.
+- Store prep (listing copy, review notes, privacy answers, privacy policy draft):
+  `docs/store/listing-and-privacy.md`.
+
+---
+
 ## What Murmur is
 A macOS menubar voice-dictation app (a Wispr Flow alternative). Hold a hotkey, speak, and it
 transcribes (local Whisper **or** cloud), cleans the text up, and pastes it at your cursor. No Dock
