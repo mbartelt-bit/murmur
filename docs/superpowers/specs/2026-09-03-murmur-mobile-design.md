@@ -25,7 +25,7 @@ and exposed to Swift and Kotlin through UniFFI. macOS keeps using the same crate
 ### Non-negotiables carried over from the product spec
 - **Local-first and free by default.** On phones the free local engine is the platform's own
   on-device speech recognition (Apple `SpeechAnalyzer` / `SFSpeechRecognizer`, Android
-  on-device `SpeechRecognizer`). No 142 MB download, no signup.
+  on-device `SpeechRecognizer`). No Murmur-managed model download, no signup.
 - **BYOK cloud optional.** Groq and OpenAI keys work exactly as on the Mac, stored in the
   platform's secure store, never in plaintext.
 - **Never lose words.** Every transcript is written to history before insertion; if
@@ -49,6 +49,16 @@ These are hard facts verified on 2026-09-03; the design does not fight them.
    keyboard extension target is added. `xcodegen` must be installed (`brew install xcodegen`).
 5. **Keyboard extensions have roughly a 50–70 MB memory ceiling.** No model loading in the
    extension, ever. The extension only draws UI and inserts text.
+6. **App Review guideline 4.4.1** (verified 2026-09-03 at developer.apple.com/app-store/review/guidelines)
+   says keyboard extensions *must* "provide keyboard input functionality (e.g. typed characters)"
+   and "remain functional without full network access and without requiring full access", and
+   *must not* "launch other apps besides Settings". Consequences baked into this design:
+   the iOS keyboard ships a real letter layout, typing works with Full Access off, and the mic
+   button's launch of Murmur's own containing app is a **documented review risk**. Shipping
+   dictation keyboards (Wispr Flow, Letterly, Typeless) use exactly this containing-app launch and
+   are approved, and the review notes will say so, but the Action Button / Control Center path
+   (§6.3) is designed as a first-class trigger that needs no keyboard launch at all, so the product
+   still works if a reviewer objects.
 
 ## 3. Repository layout after this work
 
@@ -159,14 +169,21 @@ selected engine; on Android the IME shares the app's files directory.
 ## 6. iOS: keyboard extension + recording round trip
 
 ### 6.1 Keyboard (`MurmurKeyboard`, `UIInputViewController`, Swift)
-Voice-first, not a full QWERTY (the platform auto-switches to the system keyboard for number,
-phone, decimal, and email fields, and users switch back with the globe for typing).
+A real keyboard with dictation as its headline key, because guideline 4.4.1 requires typed-character
+input and because users should never have to switch keyboards to fix one word.
 
-Layout, top to bottom, ~216 pt tall, follows system light/dark and the indigo accent:
-- A status strip: "Tap the mic to dictate" · while a result is pending: the transcript preview
-  with **Insert** (in case auto-insert did not fire) and **Discard**.
-- A large centred **mic button** (56 pt), a globe (next keyboard), delete, space, return.
-- Nothing else. No suggestions bar, no settings inside the keyboard.
+Layout, top to bottom, standard system keyboard height, system light/dark, indigo accent:
+- A status strip in place of the suggestions bar: "Tap the mic to dictate" · while a result is
+  pending: the transcript preview with **Insert** (in case auto-insert did not fire) and **Discard**.
+- Three QWERTY rows with shift, a `123` page (numbers and common symbols) and a `#+=` page,
+  delete. Key caps use the system key look so it reads as an iPhone keyboard, not a web widget.
+- Bottom row: `123`, globe (next keyboard), **mic** (left of space, where the system dictation
+  key lives, so muscle memory carries over), space, return.
+- No autocorrect, predictions, emoji page, or settings inside the keyboard in v1. The platform
+  still auto-switches to the system keyboard for number, phone, decimal, and email fields.
+
+Full Access off: every key types normally; the mic key shows a one-line explainer and a
+**Settings** button (launching Settings is allowed), nothing else changes.
 
 Behaviour:
 1. Mic tap → write `{session: UUID, requestedAt, hostHint: nil}` to the App Group
@@ -190,7 +207,8 @@ Tauri webview, before the webview finishes loading**, so cold-start latency is n
 - Stops on: tap anywhere, 1.5 s of silence after speech (auto-stop, on by default, toggle in
   settings), or 120 s hard cap.
 - Pipeline: platform speech (`SpeechAnalyzer` on iOS 26+, `SFSpeechRecognizer` with
-  `requiresOnDeviceRecognition = true` on iOS 17–25) **or** `murmur-core.transcribe_cloud`
+  `requiresOnDeviceRecognition = true` on iOS 17–25; both consume the same `AVAudioPCMBuffer`
+  tap, so one capture path feeds local and cloud) **or** `murmur-core.transcribe_cloud`
   when the engine is Groq/OpenAI → `murmur-core.clean_text` → history row → `result` to the
   App Group **and** to the clipboard.
 - Final state: the cleaned text in a card, a copy confirmation, and the line **"Swipe back to
@@ -198,10 +216,17 @@ Tauri webview, before the webview finishes loading**, so cold-start latency is n
   made to switch apps programmatically (constraint 2).
 - Errors follow the Mac rules: cloud failure falls back to local speech, then to rule cleanup;
   an empty transcript shows "Didn't catch that" and inserts nothing.
+- `SpeechAnalyzer` language assets are system-managed downloads shared with system Dictation
+  (usually already present). Onboarding calls `AssetInventory.reserve` for the user's locale so
+  the first dictation is never blocked behind a download; if assets are missing, the recorder
+  uses `SFSpeechRecognizer` on-device for that dictation.
 
 ### 6.3 Action Button / Shortcuts (`DictateIntent`, App Intents)
 - `AppShortcutsProvider` exposes **"Dictate with Murmur"** (`openAppWhenRun = true`), so it can
-  be bound to the Action Button, Back Tap, a Lock Screen control, or Siri.
+  be bound to the Action Button, Back Tap, or Siri. A `ControlWidget` (iOS 18+) exposes the same
+  intent as a Control Center button and a Lock Screen control, so every iPhone gets a one-press
+  trigger even without an Action Button. None of these launch from the keyboard, so none touch
+  guideline 4.4.1.
 - It opens the same recording screen with `source = action-button`. Delivery: clipboard always;
   App Group `result` with `session = "intent"` so the Murmur keyboard, if active in the host app,
   inserts it on return. Otherwise the user pastes.
@@ -224,16 +249,23 @@ Tauri webview, before the webview finishes loading**, so cold-start latency is n
 - Voice-first view (Compose, in a `ComposeView` hosted by the IME): the same strip + big mic +
   globe + delete + space + return layout as iOS, sized ~220 dp.
 - On show, if **Auto-listen** is on (default on) recording starts immediately; otherwise on mic tap.
-- Recording runs in the IME process with `AudioRecord` (16 kHz mono PCM). `RECORD_AUDIO` is
-  granted in the containing app during onboarding; if missing, the view shows "Open Murmur to
-  allow the microphone" with a launch button.
-- Stop: tap, 1.5 s silence, or 120 s cap. Then platform on-device `SpeechRecognizer`
-  (`EXTRA_PREFER_OFFLINE = true`; if the device has no offline model, fall through to cloud if a key
-  exists, else show "Download offline speech in Google settings" with a deep link) **or**
-  `murmur-core` cloud STT → `clean_text` → `currentInputConnection.commitText` → history row.
+- `RECORD_AUDIO` is granted in the containing app during onboarding; if missing, the view shows
+  "Open Murmur to allow the microphone" with a launch button.
+- **Local engine:** Android's `SpeechRecognizer` records from the mic itself and does not accept a
+  PCM buffer, so the IME hands it the session directly:
+  `SpeechRecognizer.createOnDeviceSpeechRecognizer` (API 31+; `createSpeechRecognizer` with
+  `EXTRA_PREFER_OFFLINE` on API 28–30). Partial results stream into the strip, which gives a live
+  preview for free. If the device has no offline model: cloud if a key exists, else "Download
+  offline speech in Google settings" with a deep link.
+- **Cloud engine:** the IME records with `AudioRecord` (16 kHz mono PCM) and calls
+  `murmur-core` cloud STT.
+- Stop: tap, 1.5 s silence, or 120 s cap. Then `clean_text` → `currentInputConnection.commitText`
+  → history row.
 - After commit: if **Return to previous keyboard** is on (default on), call
-  `switchToPreviousInputMethod()` so Gboard comes straight back. The whole round trip is: globe,
-  speak, done.
+  `switchToPreviousInputMethod()`; when there is no previous IME (Murmur was picked from Settings)
+  fall back to `switchToNextInputMethod(false)`. The whole round trip is: globe, speak, done.
+- Android v1 has no letter keys on purpose: it returns to Gboard automatically, and Play has no
+  typed-input rule. Parity with the iOS letter layout is a follow-up if users ask for it.
 - The main app's cleanup/engine settings and secrets are shared because the IME runs in the app's
   own process and sandbox.
 
@@ -267,7 +299,7 @@ Android path: globe → Murmur → (auto) record → STT → cleanup → `commit
 | Full Access off (iOS) | Keyboard shows the Full Access explainer and a Settings button; mic button disabled. |
 | Cloud key invalid/offline | Falls back to platform local speech; cleanup falls back to rules; banner in history row. |
 | Empty/silence | "Didn't catch that." Nothing inserted; nothing written to clipboard. |
-| Result never picked up (user never swiped back) | Text stays on clipboard and in history; `pending` expires after 10 minutes so it can't insert later. |
+| Result never picked up (user never swiped back) | Text stays on the clipboard (if the copy setting is on) and in history; `pending` expires after 10 minutes so it can't insert later. |
 | App killed mid-recording | Recorder writes samples to a temp file every 2 s; on next launch offers "Finish last dictation". |
 | Android no offline speech model | Deep link to Google speech settings; cloud if configured. |
 
@@ -276,6 +308,9 @@ Android path: globe → Murmur → (auto) record → STT → cleanup → `commit
 - Keys: iOS Keychain access group / Android `EncryptedSharedPreferences`, never in
   `settings.json`, never in the App Group defaults, never logged.
 - The App Group `result` holds dictated text only until inserted or for 10 minutes.
+- **Copy dictations to the clipboard** is a setting, default on, because it is the safety net for
+  the round trip. The onboarding line under it says plainly that Universal Clipboard will sync
+  those dictations to the user's other Apple devices; turning it off keeps text in Murmur only.
 - Cloud requests go only to the two hard-coded provider base URLs, as today.
 - Store disclosures: microphone, speech recognition, Full Access (iOS), and the exact list of
   where audio goes (device only, or the user's chosen provider) go in the App Privacy labels, the
@@ -288,7 +323,8 @@ Android path: globe → Murmur → (auto) record → STT → cleanup → `commit
   fallback, `resample_to_16k` channel handling, and the UniFFI error mapping.
 - **Swift (XCTest, runs on simulator in CI):** the App Group handoff codec (session matching,
   expiry, insert-once), the recorder state machine (start/stop/auto-stop/cap) with a fake audio
-  source, and the keyboard's Full-Access-off rendering.
+  source, the keyboard's Full-Access-off rendering, and the key layout (every page inserts the
+  character it shows, shift/caps behave like the system keyboard).
 - **Kotlin (JUnit + Robolectric):** the IME state machine, `commitText` + switch-back ordering
   with a fake `InputConnection`, and silence detection.
 - **React (Vitest):** mobile onboarding steps gate correctly per platform; desktop components are
@@ -309,8 +345,9 @@ Each milestone gets its own implementation plan and lands on `main` behind a gre
   emulator showing the React settings UI in phone layout. Desktop unchanged.
 - **MM1 — iOS containing app.** Native plugin (secrets, permissions, speech), mobile onboarding,
   recorder screen with local + cloud engines, history, in-app test dictation.
-- **MM2 — iOS keyboard + Action Button.** Extension target via the custom XcodeGen template, App
-  Group handoff, swipe-back flow, `DictateIntent`. **First TestFlight build.**
+- **MM2 — iOS keyboard + Action Button.** Extension target via the custom XcodeGen template, the
+  letter/number/symbol layout, App Group handoff, swipe-back flow, `DictateIntent` + Control
+  Center control. **First TestFlight build.**
 - **MM3 — Android keyboard.** IME, recording, local + cloud, switch-back, onboarding.
   **First Play internal-testing build.**
 - **MM4 — Store release.** App Store Connect app record (name availability check: "Murmur" may
@@ -319,8 +356,8 @@ Each milestone gets its own implementation plan and lands on `main` behind a gre
   `~/arkhe-native-release-tools/`; Play listing, Data Safety, production rollout with the
   existing service account.
 
-Deferred, deliberately: on-device whisper.cpp on mobile, a full QWERTY layout, streaming partial
-transcripts, custom dictionary on mobile (lands with the desktop M3 dictionary work, which will
+Deferred, deliberately: on-device whisper.cpp on mobile, autocorrect and predictions in the iOS
+keyboard, letter keys on Android, streaming partial transcripts on iOS, custom dictionary on mobile (lands with the desktop M3 dictionary work, which will
 feed the `prompt` argument that already exists in the core API).
 
 ## 13. Toolchain to install on this Mac before MM0
