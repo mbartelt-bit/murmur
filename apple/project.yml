@@ -28,10 +28,16 @@ targets:
     dependencies:
       - package: MurmurShared
         product: MurmurShared
-      # The keyboard extension (MM2 Task 2) is what really needs MurmurKeyboardCore; the app
-      # links it too so MurmurTests — which are hosted by the app — can import it.
+      # The keyboard extension is what really needs these two; the app links them as well so
+      # MurmurTests — which are hosted by the app — can import them, and so the DEBUG-only
+      # `-murmurScreen keyboardPreview` screen can draw the keyboard without installing it.
       - package: MurmurShared
         product: MurmurKeyboardCore
+      - package: MurmurShared
+        product: MurmurKeyboardUI
+      # Embeds MurmurKeyboard.appex into Murmur.app/PlugIns.
+      - target: MurmurKeyboard
+        embed: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.murmur.app
@@ -95,6 +101,57 @@ targets:
               -u MACOSX_DEPLOYMENT_TARGET -u CPATH -u LIBRARY_PATH \
               "$SRCROOT/../scripts/build-core-mobile.sh" ios
 
+  # The keyboard extension. It links MurmurKeyboardUI / MurmurKeyboardCore / MurmurSharedBase
+  # and deliberately NOT MurmurShared or MurmurCore: an extension may not record (design spec
+  # §2 constraint 1) and has roughly a 50-70 MB ceiling (constraint 5), so the Rust core, GRDB
+  # and the audio/speech files stay out of its address space. See MurmurShared/Package.swift.
+  #
+  # No keychain access group here either: the keyboard reads no API keys. It only needs the
+  # App Group, where the settings blob and the dictation hand-off live.
+  MurmurKeyboard:
+    type: app-extension
+    platform: iOS
+    sources:
+      - MurmurKeyboard
+    dependencies:
+      - package: MurmurShared
+        product: MurmurKeyboardUI
+      - package: MurmurShared
+        product: MurmurKeyboardCore
+      - package: MurmurShared
+        product: MurmurSharedBase
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.murmur.app.keyboard
+        GENERATE_INFOPLIST_FILE: NO
+        # Extensions ship inside the app, never on their own.
+        SKIP_INSTALL: YES
+        TARGETED_DEVICE_FAMILY: "1,2"
+    entitlements:
+      path: MurmurKeyboard/MurmurKeyboard.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.murmur.app
+    info:
+      path: MurmurKeyboard/Info.plist
+      properties:
+        CFBundleDisplayName: Murmur
+        # Must match the app's, or the App Store rejects the upload.
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.keyboard-service
+          NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).KeyboardViewController"
+          NSExtensionAttributes:
+            # RequestsOpenAccess is what lets the user grant Full Access, which the mic
+            # hand-off needs. Everything else on the keyboard works without it (4.4.1).
+            RequestsOpenAccess: true
+            PrimaryLanguage: en-US
+            # The layout has no way to type every ASCII character (no tab, no control keys),
+            # so iOS must not offer Murmur for a password or PIN field.
+            IsASCIICapable: false
+            PrefersRightToLeft: false
+
   MurmurTests:
     type: bundle.unit-test
     platform: iOS
@@ -112,6 +169,7 @@ schemes:
     build:
       targets:
         Murmur: all
+        MurmurKeyboard: all
     run:
       config: Debug
     test:

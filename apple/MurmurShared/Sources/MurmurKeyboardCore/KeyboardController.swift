@@ -1,6 +1,6 @@
 import Combine
 import Foundation
-import MurmurShared
+import MurmurSharedBase
 
 /// The slice of `UITextDocumentProxy` the keyboard's logic needs, so every test can type
 /// without a host app.
@@ -239,13 +239,4 @@ public final class KeyboardController: ObservableObject {
     public static func liveSleep(_ seconds: TimeInterval) async {
         try? await Task.sleep(nanoseconds: UInt64(max(0, seconds) * 1_000_000_000))
     }
-}
-
-public extension Handoff {
-    /// The fixed session an Action Button, Shortcut, or Control Center dictation uses.
-    ///
-    /// The keyboard has no way to hand one of those a session id — it was never asked — so both
-    /// sides agree on this constant instead, and the keyboard picks the text up on its next
-    /// appearance exactly the way it picks up its own (MM2 Task 3).
-    static let intentSession = UUID(uuidString: "00000000-0000-4000-8000-000000000001")!
 }

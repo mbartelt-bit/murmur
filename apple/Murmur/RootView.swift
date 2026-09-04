@@ -32,14 +32,31 @@ private struct Shell: View {
     }
 
     var body: some View {
-        Group {
-            if showsOnboarding {
-                OnboardingView(app: app)
-            } else {
-                tabs
-            }
+        content.tint(Color.murmurIndigo)
+    }
+
+    /// Debug builds get one extra destination: the keyboard preview, which a simulator can
+    /// photograph and an installed keyboard cannot.
+    @ViewBuilder
+    private var content: some View {
+        #if DEBUG
+        if ScreenshotMode.showsKeyboardPreview {
+            KeyboardPreviewScreen()
+        } else {
+            main
         }
-        .tint(Color.murmurIndigo)
+        #else
+        main
+        #endif
+    }
+
+    @ViewBuilder
+    private var main: some View {
+        if showsOnboarding {
+            OnboardingView(app: app)
+        } else {
+            tabs
+        }
     }
 
     /// Onboarding runs until it is finished — or whenever a debug launch asks for it by name.
@@ -68,7 +85,7 @@ private struct Shell: View {
 
 // MARK: - Deterministic screenshots (debug builds only)
 
-/// `-murmurScreen home|history|settings|onboarding`, passed to `simctl launch`.
+/// `-murmurScreen home|history|settings|onboarding|keyboardPreview`, passed to `simctl launch`.
 ///
 /// It exists so a screenshot pass can land on a known screen without driving the UI, and so
 /// History and Home are not photographed empty. Every branch is inside `#if DEBUG`: a release
@@ -85,6 +102,9 @@ private enum ScreenshotMode {
     }
 
     static var forcesOnboarding: Bool { requested == "onboarding" }
+
+    /// `-murmurScreen keyboardPreview` — see ``KeyboardPreviewScreen``.
+    static var showsKeyboardPreview: Bool { requested == "keyboardPreview" }
 
     static var tab: MurmurTab? {
         switch requested {
