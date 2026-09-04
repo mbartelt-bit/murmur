@@ -10,7 +10,11 @@ import PackageDescription
 //   MurmurCore     — the generated Swift bindings (Sources/MurmurCore/Generated, also
 //                    written by that script and gitignored).
 //   MurmurSharedBase — plain Foundation: the App Group, the settings model, the dictation
-//                    hand-off codec. No Rust core, no GRDB, no AVFoundation, no Speech.
+//                    hand-off codec, and KeyboardStatus (which both sides of the keyboard
+//                    heartbeat read). No Rust core, no GRDB, no AVFoundation, no Speech. The
+//                    one UIKit call in it — KeyboardStatus.openKeyboardSettings() — is behind
+//                    `#if canImport(UIKit)` and marked unavailable in an app extension, so the
+//                    keyboard still reaches Settings only through its responder chain.
 //   MurmurShared   — everything else the app needs (CoreClient, Keychain, the GRDB history
 //                    store, audio capture, the speech engines) plus `ProviderId.core`, the
 //                    one bridge from the settings model to the core's provider enum. It

@@ -43,12 +43,6 @@ public enum KeyboardPhase: Equatable {
 /// Nothing here logs. Dictated text passes through this object and is never printed.
 @MainActor
 public final class KeyboardController: ObservableObject {
-    /// Heartbeat keys the containing app reads to answer "is Full Access on?" — iOS gives the
-    /// app no way to ask directly, so the keyboard leaves a note every time it appears
-    /// (MM2 Task 4's `KeyboardStatus`).
-    public static let fullAccessKey = "keyboard.fullAccess"
-    public static let lastSeenKey = "keyboard.lastSeen"
-
     /// How long the freshly-typed confirmation stays up before the strip returns to idle.
     private static let insertedDisplay: TimeInterval = 2
 
@@ -95,9 +89,13 @@ public final class KeyboardController: ObservableObject {
 
     /// Called from `UIInputViewController.viewWillAppear`. Leaves the Full Access heartbeat,
     /// then looks for a result the app wrote while the keyboard was away.
+    ///
+    /// The heartbeat is the containing app's only way to answer "is Full Access on?" — iOS
+    /// gives it no way to ask — so the keys belong to the reader, ``KeyboardStatus``, and the
+    /// keyboard just leaves the note.
     public func viewWillAppear() {
-        defaults.set(hasFullAccess(), forKey: Self.fullAccessKey)
-        defaults.set(clock(), forKey: Self.lastSeenKey)
+        defaults.set(hasFullAccess(), forKey: KeyboardStatus.fullAccessKey)
+        defaults.set(clock(), forKey: KeyboardStatus.lastSeenKey)
         checkForResult()
     }
 

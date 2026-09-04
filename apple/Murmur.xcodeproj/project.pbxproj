@@ -44,6 +44,7 @@
 		92E4016D915EA080EA0823A4 /* MurmurKeyboardCore in Frameworks */ = {isa = PBXBuildFile; productRef = 7726A4700CCEEEFA407D4CCB /* MurmurKeyboardCore */; };
 		965395B586FC2E218C2584E9 /* HistoryStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BF6D0335BBF3C2CC18E0465 /* HistoryStoreTests.swift */; };
 		9858CDB513B05731F85AA021 /* MurmurControls.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 1C18A949B79B389EE6BACAD4 /* MurmurControls.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		9F237E73A62003540AF7296F /* KeyboardStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8366D2959EBE12E3B7C93904 /* KeyboardStatusTests.swift */; };
 		A1D598BE7BE7F424311C5823 /* CoreClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C982F3FC086F222E7E61F71 /* CoreClientTests.swift */; };
 		A2442C5F0419464F9A05AD40 /* HistoryViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B43691A72E23692740BDCFD8 /* HistoryViewModelTests.swift */; };
 		ADD927DCE86A60C57D44CB7D /* AppStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02F842543701FDD158134FA0 /* AppStateTests.swift */; };
@@ -132,6 +133,7 @@
 		732E31EA0CBE7A260E1728BE /* MurmurControls.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MurmurControls.entitlements; sourceTree = "<group>"; };
 		745B1FAABE84FAB73AC85298 /* KeychainTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainTests.swift; sourceTree = "<group>"; };
 		786FA95C503894C5064EE784 /* KeyboardLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardLayoutTests.swift; sourceTree = "<group>"; };
+		8366D2959EBE12E3B7C93904 /* KeyboardStatusTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardStatusTests.swift; sourceTree = "<group>"; };
 		87B875E4C8EC770D921EB60E /* MurmurControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MurmurControls.swift; sourceTree = "<group>"; };
 		88E22B2179A6C4875EB88D2D /* RecordingIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingIndicator.swift; sourceTree = "<group>"; };
 		8D9B6369C3F5E2AFE775F256 /* KeyboardViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardViewController.swift; sourceTree = "<group>"; };
@@ -323,6 +325,7 @@
 				DE386ED18E3758D99E1993FB /* HomeViewModelTests.swift */,
 				50A648C2739C5264BE4A4B36 /* KeyboardControllerTests.swift */,
 				786FA95C503894C5064EE784 /* KeyboardLayoutTests.swift */,
+				8366D2959EBE12E3B7C93904 /* KeyboardStatusTests.swift */,
 				4C9FFDB5D6D08CE57BC06162 /* KeyboardViewSmokeTests.swift */,
 				745B1FAABE84FAB73AC85298 /* KeychainTests.swift */,
 				1FCF80DB61B282A9F8772499 /* OnboardingViewModelTests.swift */,
@@ -577,6 +580,7 @@
 				460E4540FA3E3F1204637317 /* HomeViewModelTests.swift in Sources */,
 				0111D713BC9D9FAA7825366E /* KeyboardControllerTests.swift in Sources */,
 				0AD0EF767471AB997156710E /* KeyboardLayoutTests.swift in Sources */,
+				9F237E73A62003540AF7296F /* KeyboardStatusTests.swift in Sources */,
 				327584881BF8B661A96B8B1D /* KeyboardViewSmokeTests.swift in Sources */,
 				E361E6861DCD5F4C29328803 /* KeychainTests.swift in Sources */,
 				7FF0F4CB61C1F4DA1D50C3F2 /* OnboardingViewModelTests.swift in Sources */,

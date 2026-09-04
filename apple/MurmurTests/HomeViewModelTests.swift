@@ -53,11 +53,20 @@ final class HomeViewModelTests: XCTestCase {
         )
     }
 
-    private func makeViewModel(_ permissions: FakePermissions, app: AppState? = nil) -> HomeViewModel {
+    private func makeViewModel(
+        _ permissions: FakePermissions,
+        app: AppState? = nil,
+        keyboardEnabled: @escaping () -> Bool = { false },
+        fullAccess: @escaping () -> Bool? = { nil },
+        hasActionButton: Bool = false
+    ) -> HomeViewModel {
         HomeViewModel(
             app: app ?? makeApp(),
             permissions: permissions,
-            copy: { [weak self] in self?.copied.append($0) }
+            copy: { [weak self] in self?.copied.append($0) },
+            keyboardEnabledProvider: keyboardEnabled,
+            fullAccessProvider: fullAccess,
+            hasActionButton: hasActionButton
         )
     }
 
@@ -131,6 +140,38 @@ final class HomeViewModelTests: XCTestCase {
         viewModel.reload()
         XCTAssertEqual(viewModel.engineSummary, "Groq · connected")
         XCTAssertFalse(viewModel.engineNeedsAttention)
+    }
+
+    // MARK: - Keyboard chips
+
+    func testKeyboardChipsReadTheLiveStatus() {
+        var enabled = false
+        var access: Bool?
+        let viewModel = makeViewModel(
+            FakePermissions(),
+            keyboardEnabled: { enabled },
+            fullAccess: { access }
+        )
+
+        viewModel.reload()
+        XCTAssertFalse(viewModel.keyboardEnabled)
+        // No heartbeat yet: unknown, not "off". The chip says so rather than guessing.
+        XCTAssertNil(viewModel.fullAccess)
+
+        enabled = true
+        access = true
+        viewModel.reload()
+        XCTAssertTrue(viewModel.keyboardEnabled)
+        XCTAssertEqual(viewModel.fullAccess, true)
+
+        access = false
+        viewModel.reload()
+        XCTAssertEqual(viewModel.fullAccess, false)
+    }
+
+    func testActionButtonChipOnlyExistsOnHardwareThatHasOne() {
+        XCTAssertFalse(makeViewModel(FakePermissions(), hasActionButton: false).hasActionButton)
+        XCTAssertTrue(makeViewModel(FakePermissions(), hasActionButton: true).hasActionButton)
     }
 
     // MARK: - Dictation

@@ -85,12 +85,13 @@ private struct Shell: View {
 
 // MARK: - Deterministic screenshots (debug builds only)
 
-/// `-murmurScreen home|history|settings|onboarding|keyboardPreview`, passed to `simctl launch`.
+/// `-murmurScreen home|history|settings|onboarding|onboardingKeyboard|onboardingTriggers|keyboardPreview`,
+/// passed to `simctl launch`.
 ///
 /// It exists so a screenshot pass can land on a known screen without driving the UI, and so
 /// History and Home are not photographed empty. Every branch is inside `#if DEBUG`: a release
 /// build reports no screen, seeds nothing, and cannot be talked into either.
-private enum ScreenshotMode {
+enum ScreenshotMode {
     static var requested: String? {
         #if DEBUG
         // Launch arguments of the form `-key value` land in the standard defaults, so there
@@ -101,7 +102,18 @@ private enum ScreenshotMode {
         #endif
     }
 
-    static var forcesOnboarding: Bool { requested == "onboarding" }
+    static var forcesOnboarding: Bool { requested?.hasPrefix("onboarding") == true }
+
+    /// Which step onboarding should open on — `nil` for its normal start. The keyboard and
+    /// trigger steps are unreachable in a screenshot pass any other way: the first would need
+    /// a real microphone grant to walk to, and the second sits behind it.
+    static var onboardingStep: OnboardingViewModel.Step? {
+        switch requested {
+        case "onboardingKeyboard": return .keyboard
+        case "onboardingTriggers": return .triggers
+        default: return nil
+        }
+    }
 
     /// `-murmurScreen keyboardPreview` — see ``KeyboardPreviewScreen``.
     static var showsKeyboardPreview: Bool { requested == "keyboardPreview" }

@@ -19,6 +19,14 @@ final class HomeViewModel: ObservableObject {
     @Published var engineNeedsAttention = false
     /// The row whose "Copied" check is showing.
     @Published var copiedID: Int64?
+    /// The Murmur keyboard is in the user's keyboard list.
+    @Published var keyboardEnabled = false
+    /// The keyboard's Full Access heartbeat — `nil` until the keyboard has appeared once.
+    @Published var fullAccess: Bool?
+
+    /// This iPhone has an Action Button, so Home offers to set it up. Hardware never changes
+    /// under a running app, so it is read once.
+    let hasActionButton: Bool
 
     /// How many dictations Home shows (spec §5: "the last three dictations").
     static let recentCount = 3
@@ -26,6 +34,8 @@ final class HomeViewModel: ObservableObject {
     private let app: AppState
     private let permissions: PermissionsProviding
     private let pasteboard: (String) -> Void
+    private let keyboardEnabledProvider: () -> Bool
+    private let fullAccessProvider: () -> Bool?
     private var copyResetTask: Task<Void, Never>?
 
     /// `permissions` and `copy` are injected after `app` so the documented `init(app:)` call
@@ -33,11 +43,17 @@ final class HomeViewModel: ObservableObject {
     init(
         app: AppState,
         permissions: PermissionsProviding = LivePermissions(),
-        copy: @escaping (String) -> Void = { UIPasteboard.general.string = $0 }
+        copy: @escaping (String) -> Void = { UIPasteboard.general.string = $0 },
+        keyboardEnabledProvider: @escaping () -> Bool = { KeyboardStatus.isEnabled() },
+        fullAccessProvider: @escaping () -> Bool? = { KeyboardStatus.hasFullAccess() },
+        hasActionButton: Bool = KeyboardStatus.hasActionButton
     ) {
         self.app = app
         self.permissions = permissions
         pasteboard = copy
+        self.keyboardEnabledProvider = keyboardEnabledProvider
+        self.fullAccessProvider = fullAccessProvider
+        self.hasActionButton = hasActionButton
     }
 
     /// The speech chip only exists while the on-device engine is the one that would run: a
@@ -48,8 +64,8 @@ final class HomeViewModel: ObservableObject {
 
     var historyUnavailable: Bool { app.historyUnavailable }
 
-    /// Re-reads permissions, the engine choice and the last three rows. Called when the screen
-    /// appears and every time a dictation finishes.
+    /// Re-reads permissions, the engine choice, the keyboard's two answers and the last three
+    /// rows. Called when the screen appears and every time a dictation finishes.
     func reload() {
         mic = permissions.micStatus()
         speech = permissions.speechStatus()
@@ -63,6 +79,9 @@ final class HomeViewModel: ObservableObject {
         }
         engineSummary = Copy.engineSummary(stt: stt, keyPresent: keyPresent)
         engineNeedsAttention = !keyPresent
+
+        keyboardEnabled = keyboardEnabledProvider()
+        fullAccess = fullAccessProvider()
 
         recent = (try? app.history.recent(Self.recentCount)) ?? []
     }

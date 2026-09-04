@@ -2,7 +2,8 @@ import MurmurShared
 import SwiftUI
 
 /// First run. One step per screen, one primary button per step, in the spec's order: the
-/// microphone, speech recognition, the engine, and one real dictation.
+/// microphone, speech recognition, the engine, the keyboard, the other ways to start a
+/// dictation, and one real one.
 ///
 /// Everything that decides *whether* a step is done lives in ``OnboardingViewModel``; this
 /// file only decides what it looks like.
@@ -15,15 +16,22 @@ struct OnboardingView: View {
     init(app: AppState) {
         self.app = app
         let history = app.history
-        _viewModel = StateObject(
-            wrappedValue: OnboardingViewModel(
-                settings: app.settings,
-                hasTestTranscript: {
-                    let rows = (try? history.recent(HomeViewModel.recentCount)) ?? []
-                    return rows.contains { $0.source == .inApp }
-                }
-            )
+        let model = OnboardingViewModel(
+            settings: app.settings,
+            hasTestTranscript: {
+                let rows = (try? history.recent(HomeViewModel.recentCount)) ?? []
+                return rows.contains { $0.source == .inApp }
+            }
         )
+        // "Test it" on the triggers step runs exactly what the Action Button runs, down to the
+        // session id, so what the user sees here is what they will see from the hardware.
+        model.onTestTrigger = { [weak app] in
+            app?.activeDictation = DictationRequest(session: Handoff.intentSession, source: .actionButton)
+        }
+        #if DEBUG
+        if let step = ScreenshotMode.onboardingStep { model.step = step }
+        #endif
+        _viewModel = StateObject(wrappedValue: model)
         _engine = StateObject(
             wrappedValue: EngineSettingsViewModel(settings: app.settings, secrets: app.secrets)
         )
@@ -50,6 +58,11 @@ struct OnboardingView: View {
         // Reaching the engine step with Local selected starts the model download, if any.
         .task(id: viewModel.step) {
             if viewModel.step == .engine, viewModel.stt == .local { await viewModel.prepareLocal() }
+        }
+        // The keyboard step is the one the user leaves mid-way, so it watches for the answer
+        // instead of waiting to be told. Cancelled by SwiftUI when the step changes.
+        .task(id: viewModel.step) {
+            if viewModel.step == .keyboard { await viewModel.pollKeyboardStatus() }
         }
         .onChange(of: engine.verifyState) { _, states in
             viewModel.cloudVerified = viewModel.stt.provider.map { states[$0] == .connected } ?? false
@@ -120,6 +133,8 @@ struct OnboardingView: View {
         case .microphone: return Copy.micStepTitle
         case .speech: return Copy.speechStepTitle
         case .engine: return Copy.engineStepTitle
+        case .keyboard: return Copy.keyboardStepTitle
+        case .triggers: return Copy.triggersStepTitle
         case .test: return Copy.testStepTitle
         }
     }
@@ -129,6 +144,8 @@ struct OnboardingView: View {
         case .microphone: return Copy.micStepBody
         case .speech: return Copy.speechStepBody
         case .engine: return Copy.engineStepBody
+        case .keyboard: return Copy.keyboardStepBody
+        case .triggers: return Copy.triggersStepBody
         case .test: return Copy.testStepBody
         }
     }
@@ -142,6 +159,10 @@ struct OnboardingView: View {
             permissionCard(status: viewModel.speech, granted: Copy.speechGranted, denied: Copy.speechDenied)
         case .engine:
             engineStep
+        case .keyboard:
+            keyboardStep
+        case .triggers:
+            triggersStep
         case .test:
             testStep
         }
@@ -191,6 +212,116 @@ struct OnboardingView: View {
         }
     }
 
+    /// The path, the Full Access line, and the way to check — plus the live answer, which the
+    /// step polls for while the user is away in Settings.
+    private var keyboardStep: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Card {
+                VStack(alignment: .leading, spacing: 12) {
+                    instruction(number: 1, text: Copy.keyboardStepPath)
+                    instruction(number: 2, text: Copy.keyboardFullAccessLine)
+                    instruction(number: 3, text: Copy.keyboardCheckLine)
+                }
+            }
+
+            Card {
+                VStack(alignment: .leading, spacing: 12) {
+                    statusLine(
+                        ok: viewModel.keyboardEnabled,
+                        text: viewModel.keyboardEnabled ? Copy.keyboardStepDone : Copy.keyboardStepWaiting
+                    )
+
+                    if !viewModel.fullAccessDeferred {
+                        Divider()
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            statusLine(ok: viewModel.fullAccess == true, text: fullAccessText)
+                            if viewModel.fullAccess != true {
+                                Spacer(minLength: 0)
+                                Button(Copy.later) { viewModel.deferFullAccess() }
+                                    .font(.caption)
+                                    .buttonStyle(.plain)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var fullAccessText: String {
+        switch viewModel.fullAccess {
+        case true?: return Copy.fullAccessOn
+        case false?: return Copy.fullAccessOff
+        default: return Copy.fullAccessUnknown
+        }
+    }
+
+    /// Control Center on every iPhone (iOS 18+), the Action Button only where there is one.
+    private var triggersStep: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Card {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label(Copy.controlCenterTitle, systemImage: "switch.2")
+                        .font(.subheadline.weight(.semibold))
+                    Text(Copy.controlCenterCopy)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if viewModel.hasActionButton {
+                Card {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label(Copy.actionButtonTitle, systemImage: "button.horizontal.top.press")
+                            .font(.subheadline.weight(.semibold))
+                        Text(Copy.actionButtonCopy)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+
+            Button {
+                viewModel.testTrigger()
+            } label: {
+                Label(Copy.testIt, systemImage: "mic.fill")
+                    .font(.body.weight(.medium))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+            }
+            .buttonStyle(.bordered)
+            .tint(Color.murmurIndigo)
+        }
+    }
+
+    private func instruction(number: Int, text: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text("\(number)")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.white)
+                .frame(width: 18, height: 18)
+                .background(Color.murmurIndigo, in: Circle())
+            Text(text)
+                .font(.subheadline)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func statusLine(ok: Bool, text: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Image(systemName: ok ? "checkmark.circle.fill" : "circle.dashed")
+                .foregroundStyle(ok ? Color.green : Color.secondary)
+            Text(text)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
     private var testStep: some View {
         Card {
             VStack(alignment: .leading, spacing: 14) {
@@ -226,8 +357,12 @@ struct OnboardingView: View {
         case .speech:
             if viewModel.speech == .granted || viewModel.stt != .local { return Copy.continueLabel }
             return viewModel.speech == .denied ? Copy.openSettings : Copy.speechAllow
-        case .engine:
+        case .engine, .triggers:
             return Copy.continueLabel
+        case .keyboard:
+            // Same shape as a permission step: the way to do the one job until it is done,
+            // then the way onward. Nothing else on this screen can add the keyboard.
+            return viewModel.keyboardEnabled ? Copy.continueLabel : Copy.openSettings
         case .test:
             return Copy.finish
         }
@@ -237,8 +372,8 @@ struct OnboardingView: View {
         switch viewModel.step {
         // A permission step's button is never dead: it is either the prompt, the way to
         // Settings, or Continue.
-        case .microphone, .speech: return false
-        case .engine, .test: return !viewModel.canAdvance
+        case .microphone, .speech, .keyboard: return false
+        case .engine, .triggers, .test: return !viewModel.canAdvance
         }
     }
 
@@ -252,8 +387,10 @@ struct OnboardingView: View {
             if viewModel.canAdvance { viewModel.advance() }
             else if viewModel.speech == .denied { Permissions.openSettings() }
             else { Task { await viewModel.requestSpeech(); if viewModel.canAdvance { viewModel.advance() } } }
-        case .engine:
+        case .engine, .triggers:
             viewModel.advance()
+        case .keyboard:
+            if viewModel.keyboardEnabled { viewModel.advance() } else { KeyboardStatus.openKeyboardSettings() }
         case .test:
             viewModel.finish()
         }

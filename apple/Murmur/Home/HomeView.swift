@@ -1,7 +1,7 @@
 import MurmurShared
 import SwiftUI
 
-/// The screen Murmur opens on: one big button, three status chips, the last three dictations.
+/// The screen Murmur opens on: one big button, the readiness chips, the last three dictations.
 ///
 /// The button is deliberately the largest thing on the phone — the whole product is "press
 /// this and talk" — and the chips sit under it rather than above so that a healthy app reads
@@ -12,6 +12,9 @@ struct HomeView: View {
     var onOpenSettings: () -> Void = {}
 
     @StateObject private var viewModel: HomeViewModel
+    /// iOS publishes no link to the Action Button pane, so the "set it up" chip opens a sheet
+    /// with the path written out instead of pretending to deep-link there.
+    @State private var showsActionButtonGuide = false
 
     init(app: AppState, onOpenSettings: @escaping () -> Void = {}) {
         self.app = app
@@ -40,6 +43,7 @@ struct HomeView: View {
         .onChange(of: app.activeDictation) { _, request in
             if request == nil { viewModel.reload() }
         }
+        .sheet(isPresented: $showsActionButtonGuide) { actionButtonGuide }
     }
 
     // MARK: - Pieces
@@ -87,8 +91,70 @@ struct HomeView: View {
                     state: viewModel.engineNeedsAttention ? .attention : .ok,
                     action: onOpenSettings
                 )
+                Divider()
+                // Both keyboard chips lead to the same place, because iOS has exactly one
+                // public link into Settings and the difference is only in what to tap there.
+                StatusChip(
+                    title: Copy.chipKeyboard,
+                    detail: viewModel.keyboardEnabled ? Copy.chipOn : Copy.chipOff,
+                    state: viewModel.keyboardEnabled ? .ok : .attention,
+                    action: { KeyboardStatus.openKeyboardSettings() }
+                )
+                Divider()
+                StatusChip(
+                    title: Copy.chipFullAccess,
+                    detail: fullAccessDetail,
+                    state: viewModel.fullAccess == true ? .ok : .attention,
+                    action: { KeyboardStatus.openKeyboardSettings() }
+                )
+                if viewModel.hasActionButton {
+                    Divider()
+                    StatusChip(
+                        title: Copy.chipActionButton,
+                        detail: Copy.chipSetUp,
+                        state: .attention,
+                        action: { showsActionButtonGuide = true }
+                    )
+                }
             }
         }
+    }
+
+    private var fullAccessDetail: String {
+        switch viewModel.fullAccess {
+        case true?: return Copy.chipOn
+        case false?: return Copy.chipOff
+        default: return Copy.chipUnknown
+        }
+    }
+
+    /// Three lines and the one button iOS allows: Settings opens at Murmur's own pane, and the
+    /// user walks the rest of the way.
+    private var actionButtonGuide: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(Copy.actionButtonTitle)
+                .font(.title3.weight(.semibold))
+            Text(Copy.triggersStepBody)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Text(Copy.actionButtonCopy)
+                .font(.subheadline)
+            Button {
+                showsActionButtonGuide = false
+                KeyboardStatus.openKeyboardSettings()
+            } label: {
+                Text(Copy.openSettings)
+                    .font(.body.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Color.murmurIndigo)
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(20)
+        .presentationDetents([.height(280)])
     }
 
     @ViewBuilder

@@ -97,15 +97,15 @@ final class KeyboardControllerTests: XCTestCase {
         let controller = makeController(fullAccess: true)
         controller.viewWillAppear()
 
-        XCTAssertEqual(defaults.bool(forKey: KeyboardController.fullAccessKey), true)
-        XCTAssertEqual(defaults.object(forKey: KeyboardController.lastSeenKey) as? Date, t0)
+        XCTAssertEqual(defaults.bool(forKey: KeyboardStatus.fullAccessKey), true)
+        XCTAssertEqual(defaults.object(forKey: KeyboardStatus.lastSeenKey) as? Date, t0)
     }
 
     func testViewWillAppearRecordsFullAccessOff() {
         let controller = makeController(fullAccess: false)
         controller.viewWillAppear()
 
-        XCTAssertEqual(defaults.object(forKey: KeyboardController.fullAccessKey) as? Bool, false)
+        XCTAssertEqual(defaults.object(forKey: KeyboardStatus.fullAccessKey) as? Bool, false)
     }
 
     // MARK: - Mic
