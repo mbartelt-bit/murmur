@@ -1,0 +1,13 @@
+# Bindings config for `uniffi-bindgen generate --library ...`
+# (scripts/build-core-mobile.sh). Read from the crate root by cargo metadata.
+
+[bindings.swift]
+# `import MurmurCore` in app code; the C shim the Swift file imports is
+# MurmurCoreFFI, matching the modulemap the build script assembles.
+module_name = "MurmurCore"
+ffi_module_name = "MurmurCoreFFI"
+
+[bindings.kotlin]
+package_name = "app.murmur.core"
+# The library name loadJndiLibrary() looks for in jniLibs (libmurmur_core.so).
+cdylib_name = "murmur_core"

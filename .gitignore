@@ -15,6 +15,12 @@ dist-ssr
 # Cargo workspace build output (the workspace root moved here with murmur-core)
 /target/
 
+# Mobile build outputs — all produced by scripts/build-core-mobile.sh, never committed
+apple/Frameworks/
+apple/MurmurShared/Sources/MurmurCore/Generated/
+android/app/src/main/jniLibs/
+android/app/src/main/java/app/murmur/core/
+
 # Subagent-driven-development scratch reports/diffs
 .superpowers/
 
