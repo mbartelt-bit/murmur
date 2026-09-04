@@ -10,10 +10,8 @@ import com.murmur.app.data.SecretStore
 import com.murmur.app.data.SettingsStore
 import com.murmur.app.data.history.HistoryDatabase
 import com.murmur.app.data.history.HistoryStore
-import com.murmur.app.engine.AudioSession
 import com.murmur.app.engine.DictationPipeline
-import com.murmur.app.engine.PipelineError
-import com.murmur.app.engine.SpeechEngine
+import com.murmur.app.engine.SpeechEngines
 
 /** The one settings file. `preferencesDataStore` refuses to open it twice in a process. */
 private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(name = "murmur.settings")
@@ -41,12 +39,9 @@ class AppGraph private constructor(context: Context) {
             settings = settings,
             secrets = secrets,
             history = history,
-            // Task 2 replaces these with SpeechEngines.local / .cloud and its
-            // isLocalAvailable(context) check; until then a dictation reports that there is
-            // no engine rather than pretending to listen.
-            localEngine = { UnavailableSpeechEngine },
-            cloudEngine = { UnavailableSpeechEngine },
-            offlineAvailable = { false },
+            localEngine = { SpeechEngines.local(app) },
+            cloudEngine = SpeechEngines::cloud,
+            offlineAvailable = { SpeechEngines.isLocalAvailable(app) },
         )
     }
 
@@ -62,10 +57,4 @@ class AppGraph private constructor(context: Context) {
                 instance ?: AppGraph(context).also { instance = it }
             }
     }
-}
-
-/** Placeholder until Task 2 lands the real engines. */
-private object UnavailableSpeechEngine : SpeechEngine {
-    override suspend fun transcribe(session: AudioSession, partial: (String) -> Unit): String =
-        throw PipelineError.NoSpeechEngine
 }
