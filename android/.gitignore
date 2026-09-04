@@ -1,0 +1,11 @@
+# Local Android SDK location (see README.md; ANDROID_HOME works too)
+local.properties
+
+# Gradle / build outputs
+.gradle/
+build/
+.kotlin/
+
+# IDE
+*.iml
+.idea/
