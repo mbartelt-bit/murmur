@@ -10,6 +10,8 @@ import com.murmur.app.data.SecretStore
 import com.murmur.app.data.SettingsStore
 import com.murmur.app.data.history.HistoryDatabase
 import com.murmur.app.data.history.HistoryStore
+import com.murmur.app.debug.DebugHooks
+import com.murmur.app.engine.AudioSession
 import com.murmur.app.engine.DictationPipeline
 import com.murmur.app.engine.SpeechEngines
 
@@ -33,6 +35,23 @@ class AppGraph private constructor(context: Context) {
     val secrets: SecretStore by lazy { EncryptedSecretStore(app) }
 
     val history: HistoryStore by lazy { HistoryStore(HistoryDatabase.file(app).transcripts()) }
+
+    /**
+     * The microphone for one dictation, for both the keyboard and the in-app recorder.
+     *
+     * `cloud = true` wants the real recorder (the cloud engine needs a buffer); `false` wants
+     * the recognizer's session, because Android's on-device `SpeechRecognizer` records for
+     * itself. Exactly one component records per dictation (design spec section 7.1).
+     *
+     * It lives on the graph rather than in each caller's default so a debug build has one
+     * place to swap in the emulator's fake audio; in a release build `DebugHooks` is the no-op
+     * twin and this is the real factory, unchanged.
+     */
+    val sessionFactory: (cloud: Boolean) -> AudioSession by lazy {
+        DebugHooks.sessionFactory(app) { cloud ->
+            if (cloud) SpeechEngines.cloudSession() else SpeechEngines.localSession()
+        }
+    }
 
     val pipeline: DictationPipeline by lazy {
         DictationPipeline(

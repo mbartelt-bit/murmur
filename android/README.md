@@ -62,3 +62,71 @@ screenshot pass does not have to drive the UI. A release build ignores it.
 | `app/src/main/java/com/murmur/app/{data,engine,audio}/` | Settings, secrets, history, and the dictation pipeline |
 | `app/src/main/java/app/murmur/core/` | Generated UniFFI bindings (build output, gitignored) |
 | `app/src/main/jniLibs/` | `libmurmur_core.so` per ABI (build output, gitignored) |
+
+## Release build
+
+```bash
+./gradlew bundleRelease      # app/build/outputs/bundle/release/app-release.aab
+./gradlew assembleRelease    # the same, as an APK
+```
+
+Release is minified: R8 shrinks the code and the resources, and `app/proguard-rules.pro`
+keeps the two things it cannot see — JNA's reflection into `libmurmur_core.so` (the whole
+`app.murmur.core` package, which is generated and so cannot be annotated) and the input
+method, which the system resolves by name. After a change to the rules, check
+`app/build/outputs/mapping/release/` : `seeds.txt` should list ~740 `app.murmur.core`
+entries and `mapping.txt` should map them to themselves.
+
+Signing reads `android/keystore.properties`, which is gitignored — copy
+`keystore.properties.example` and fill it in. **Without that file the bundle still builds,
+unsigned**, so a fresh clone and CI can verify the release path; Gradle prints a warning
+saying the .aab cannot be uploaded.
+
+## Play (internal testing)
+
+One-time, in the Play Console (Matt):
+
+1. **Create app**: name Murmur (or Murmur Dictation), English (US), app, free. The package
+   `com.murmur.app` is fixed by the first upload.
+2. Create the upload keystore once and keep it out of the repo:
+   ```bash
+   mkdir -p ~/murmur-android-signing
+   keytool -genkeypair -v -keystore ~/murmur-android-signing/murmur-upload.jks \
+     -alias murmur -keyalg RSA -keysize 2048 -validity 10000
+   cp keystore.properties.example keystore.properties   # then fill in the path + passwords
+   ```
+   Play App Signing holds the app signing key; this is only the upload key. Back up the
+   `.jks` and both passwords in the password manager.
+3. **Users and permissions** → grant the service account (the JSON at
+   `~/arkhe-android-signing/play-service-account.json`, or a new one saved to
+   `~/murmur-android-signing/play-service-account.json`) **Release manager** on Murmur.
+   Until this is done every upload stops at `403 The caller does not have permission`.
+4. Store-listing minimums for internal testing: app name, short/full description
+   placeholders, a privacy policy URL, and the Data Safety form — microphone audio is
+   processed on device or sent to the user's chosen provider; Murmur collects nothing.
+
+Then `scripts/android-play-upload.sh` builds and uploads (see `scripts/README.md`);
+`node scripts/play-upload.mjs --aab <path> --dry-run` authenticates and reads the track
+without uploading.
+
+## Debug-only fake audio
+
+An emulator has no microphone, so a debug build can be told to play a bundled 16 kHz mono
+WAV (`app/src/debug/res/raw/sample_dictation.wav`) into the pipeline instead:
+
+```bash
+adb shell am start -n com.murmur.app/.MainActivity -e murmurFakeAudio 1
+```
+
+The flag is process-wide, so the keyboard picks it up too — the app and the IME share one
+process. `-e murmurFakeAudio 0` clears it; so does killing the app.
+
+**It only exercises the cloud path.** `FakeAudioSession` stands in for `AudioRecorder`,
+which is the cloud engine's microphone; the on-device engine never uses an `AudioSession`
+for audio at all, because Android's `SpeechRecognizer` opens the microphone itself and
+cannot be handed a buffer. Real on-device dictation is the device gate below, not
+something an emulator can show.
+
+Everything is in `src/debug/java/com/murmur/app/debug/`; `src/release/java/` holds a
+`DebugHooks` twin whose two methods do nothing, so neither the flag, nor the fake session,
+nor the WAV exists in a release build.

@@ -7,6 +7,7 @@ import androidx.lifecycle.lifecycleScope
 import com.murmur.app.data.history.HistoryStore
 import com.murmur.app.data.history.TranscriptEntity
 import com.murmur.app.data.history.TranscriptSource
+import com.murmur.app.debug.DebugHooks
 import com.murmur.app.di.AppGraph
 import com.murmur.app.ime.MurmurInputMethodService
 import com.murmur.app.ui.Route
@@ -25,6 +26,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // `-e murmurFakeAudio 1`: an emulator has no microphone, so a debug build can be told
+        // to play a bundled WAV into the cloud path instead. A no-op in release, where neither
+        // the flag nor the fake session is compiled in.
+        DebugHooks.noteLaunchIntent(intent)
         val graph = AppGraph.get(this)
 
         // The keyboard's "Open Murmur" button. An input method cannot show the runtime

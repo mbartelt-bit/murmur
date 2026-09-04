@@ -190,6 +190,7 @@ fun RootNav(
                             pipeline = graph.pipeline.asDictation(),
                             permissions = micGranted,
                             offlineAvailable = localAvailable,
+                            sessionFactory = graph.sessionFactory,
                         )
                     }
                     RecorderScreen(

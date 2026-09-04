@@ -1,9 +1,23 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
 }
+
+/**
+ * The upload keystore, when this machine has one: `android/keystore.properties` (gitignored,
+ * see `keystore.properties.example`).
+ *
+ * A fresh clone and CI have no keystore and must still be able to build the bundle, so a
+ * missing file is not an error — `bundleRelease` just produces an *unsigned* .aab, which is
+ * fine for size checks and R8 verification and useless to Play. The warning below says so.
+ */
+val keystoreProps: Properties? = rootProject.file("keystore.properties")
+    .takeIf { it.isFile }
+    ?.let { file -> Properties().apply { file.inputStream().use(::load) } }
 
 android {
     namespace = "com.murmur.app"
@@ -16,7 +30,9 @@ android {
         applicationId = "com.murmur.app"
         minSdk = 28
         targetSdk = 35
-        versionCode = 1
+        // Every Play upload needs a strictly higher code; scripts/android-play-upload.sh sets
+        // this to the current UTC minute (yyMMddHHmm). 1 is only ever a local build.
+        versionCode = (System.getenv("MURMUR_VERSION_CODE") ?: "1").toInt()
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -26,9 +42,31 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            // Left empty when this machine has no keystore.properties; the release build type
+            // then signs with nothing rather than failing.
+            keystoreProps?.let { props ->
+                // Relative paths resolve against `android/`, absolute ones are taken as-is,
+                // so the keystore can live outside the repo (it must).
+                storeFile = rootProject.file(props.getProperty("storeFile"))
+                storePassword = props.getProperty("storePassword")
+                keyAlias = props.getProperty("keyAlias")
+                keyPassword = props.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            signingConfig = if (keystoreProps != null) signingConfigs.getByName("release") else null
+            // R8 keeps the UniFFI binding, JNA, Room and the input method — see proguard-rules.pro.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 
@@ -108,4 +146,18 @@ val buildRustCore by tasks.registering(Exec::class) {
 
 tasks.named("preBuild") {
     dependsOn(buildRustCore)
+}
+
+// Say it out loud rather than handing someone an .aab Play will reject at upload.
+if (keystoreProps == null) {
+    tasks.matching { it.name == "bundleRelease" || it.name == "assembleRelease" }
+        .configureEach {
+            doFirst {
+                logger.warn(
+                    "warning: android/keystore.properties not found — this release build is " +
+                        "UNSIGNED and cannot be uploaded to Play. Copy " +
+                        "android/keystore.properties.example and fill it in to sign it.",
+                )
+            }
+        }
 }

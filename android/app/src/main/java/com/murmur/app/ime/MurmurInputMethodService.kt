@@ -69,6 +69,7 @@ class MurmurInputMethodService :
         controller = ImeController(
             settings = graph.settings,
             pipeline = graph.pipeline.asDictation(),
+            sessionFactory = graph.sessionFactory,
             permissions = { Permissions.hasRecordAudio(this) },
             offlineAvailable = { SpeechEngines.isLocalAvailable(this) },
             scope = scope,

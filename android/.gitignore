@@ -9,3 +9,9 @@ build/
 # IDE
 *.iml
 .idea/
+
+# Release signing — the upload keystore and its passwords never go in the repo
+# (see keystore.properties.example).
+keystore.properties
+*.jks
+*.keystore
