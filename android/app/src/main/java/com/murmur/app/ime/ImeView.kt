@@ -20,6 +20,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Backspace
+import androidx.compose.material.icons.automirrored.filled.KeyboardReturn
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -38,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -264,44 +270,74 @@ private fun KeyRow(
     ) {
         if (showsGlobe) {
             Key(
-                label = stringResource(R.string.ime_key_globe),
+                description = stringResource(R.string.ime_key_globe),
                 onClick = onGlobe,
                 modifier = Modifier.width(72.dp),
+            ) {
+                KeyIcon(Icons.Default.Language)
+            }
+        }
+        Key(
+            description = stringResource(R.string.ime_key_delete),
+            onClick = onDelete,
+            modifier = Modifier.width(72.dp),
+        ) {
+            KeyIcon(Icons.AutoMirrored.Filled.Backspace)
+        }
+        // The one key wide enough to say what it is in words, exactly as every other keyboard
+        // labels it.
+        Key(
+            description = stringResource(R.string.ime_key_space),
+            onClick = onSpace,
+            modifier = Modifier.weight(1f),
+        ) {
+            Text(
+                text = stringResource(R.string.ime_key_space_label),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
             )
         }
         Key(
-            label = stringResource(R.string.ime_key_delete),
-            onClick = onDelete,
-            modifier = Modifier.width(72.dp),
-        )
-        Key(
-            label = stringResource(R.string.ime_key_space),
-            onClick = onSpace,
-            modifier = Modifier.weight(1f),
-        )
-        Key(
-            label = stringResource(R.string.ime_key_return),
+            description = stringResource(R.string.ime_key_return),
             onClick = onReturn,
             modifier = Modifier.width(84.dp),
-        )
+        ) {
+            KeyIcon(Icons.AutoMirrored.Filled.KeyboardReturn)
+        }
     }
 }
 
+/**
+ * One key. [description] is what TalkBack reads — the glyph itself carries no text, which is
+ * exactly why it has to be spelled out here.
+ */
 @Composable
-private fun Key(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun Key(
+    description: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
     Box(
         modifier = modifier
             .fillMaxSize()
             .clip(RoundedCornerShape(8.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
+            .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center,
-        )
-    }
+        content = { content() },
+    )
+}
+
+@Composable
+private fun KeyIcon(icon: ImageVector) {
+    Icon(
+        imageVector = icon,
+        // The key itself carries the label; a second one here would be read out twice.
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.size(22.dp),
+    )
 }

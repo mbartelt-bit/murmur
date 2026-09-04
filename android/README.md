@@ -48,18 +48,17 @@ until [ "$("$ANDROID_HOME/platform-tools/adb" shell getprop sys.boot_completed 2
 "$ANDROID_HOME/platform-tools/adb" emu kill
 ```
 
-The screen shows the title **Murmur**, the Groq key page URL from
-`keyPageUrl(Provider.GROQ)`, and a **Run core** button. Tapping it calls
-`cleanText("um hello world", null)` across the FFI and renders `Cleaned: Hello world.` —
-which is the proof that the native library loaded and the Rust rules cleanup ran.
+Debug builds accept `--es murmurScreen home|history|settings|onboarding|recorder` on that
+`am start`, which lands on one screen (and seeds two history rows the first time) so a
+screenshot pass does not have to drive the UI. A release build ignores it.
 
 ## Layout
 
 | Path | What |
 |---|---|
 | `app/src/main/java/com/murmur/app/MainActivity.kt` | Compose host activity |
-| `app/src/main/java/com/murmur/app/HomeScreen.kt` | The shell UI + the pure `formatCleaned` helper |
-| `app/src/main/java/com/murmur/app/CoreClient.kt` | Facade over the generated bindings |
-| `app/src/test/java/com/murmur/app/CoreClientTest.kt` | JVM tests for `formatCleaned` |
+| `app/src/main/java/com/murmur/app/ui/` | The app's screens: onboarding, home, history, settings, in-app dictation |
+| `app/src/main/java/com/murmur/app/ime/` | The Murmur voice keyboard |
+| `app/src/main/java/com/murmur/app/{data,engine,audio}/` | Settings, secrets, history, and the dictation pipeline |
 | `app/src/main/java/app/murmur/core/` | Generated UniFFI bindings (build output, gitignored) |
 | `app/src/main/jniLibs/` | `libmurmur_core.so` per ABI (build output, gitignored) |

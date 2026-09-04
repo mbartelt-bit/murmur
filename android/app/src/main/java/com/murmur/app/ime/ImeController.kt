@@ -121,6 +121,12 @@ class ImeController(
     private val clock: () -> Long = System::currentTimeMillis,
     private val scope: CoroutineScope,
     private val maxDurationMs: Long = 120_000,
+    /**
+     * What history calls a dictation this controller ran. The keyboard's own is
+     * [TranscriptSource.KEYBOARD]; the in-app recorder reuses this whole state machine with a
+     * Compose-backed sink and passes [TranscriptSource.IN_APP] instead.
+     */
+    private val source: TranscriptSource = TranscriptSource.KEYBOARD,
 ) {
 
     private val _phase = MutableStateFlow<ImePhase>(ImePhase.Idle)
@@ -263,7 +269,7 @@ class ImeController(
         }
 
         try {
-            val outcome = pipeline.run(session, TranscriptSource.KEYBOARD, ::notePartial, forceLocal)
+            val outcome = pipeline.run(session, source, ::notePartial, forceLocal)
             deliver(outcome, returnToPrevious = current.returnToPreviousKeyboard)
         } catch (cancelled: CancellationException) {
             throw cancelled

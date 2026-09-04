@@ -43,6 +43,9 @@ android {
 
     buildFeatures {
         compose = true
+        // The About row reads BuildConfig.VERSION_NAME, and the debug-only screenshot
+        // launcher reads BuildConfig.DEBUG.
+        buildConfig = true
     }
 
     testOptions {
@@ -62,6 +65,9 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
+    // The keyboard's bottom row draws the globe, backspace and return glyphs every other
+    // keyboard uses; words in their place read as buttons for something else.
+    implementation("androidx.compose.material:material-icons-extended")
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
