@@ -1,0 +1,7 @@
+# Per-user Xcode / SwiftPM state. The project itself (Murmur.xcodeproj, generated from
+# project.yml) is committed; everything below is machine-local and never is.
+xcuserdata/
+*.xcuserdatad
+.swiftpm/
+.build/
+DerivedData/
