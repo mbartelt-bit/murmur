@@ -69,8 +69,9 @@ fresh clone builds without XcodeGen), plus the Gradle wrapper.
   Gradle (like Xcode) runs with a stripped `PATH` that lacks `~/.cargo/bin`. `. "$HOME/.cargo/env"`
   in the shell you launch `./gradlew` from. Android also needs `cargo-ndk` and NDK `27.2.12479018`.
 - **`whisper` is desktop-only.** Both mobile modes build `--no-default-features` on purpose: the
-  `whisper` feature drags in cmake + whisper.cpp, which we do not cross-compile for phones. On-device
-  inference on mobile is deliberately deferred; phones use the cloud engines. Never "fix" a mobile
+  `whisper` feature drags in cmake + whisper.cpp, which we do not cross-compile for phones. Phones get
+  their free local engine from the platform instead (Apple `SpeechAnalyzer`/`SFSpeechRecognizer`,
+  Android `SpeechRecognizer`; MM1/MM3), with the same cloud engines optional. Never "fix" a mobile
   build by turning the feature on.
 - `murmur-core` holds **no state and no secrets** — no Tauri, no store, no Keychain. Callers pass a
   `CloudConfig` in. Keep it that way; it is what makes the crate shareable across three front ends.

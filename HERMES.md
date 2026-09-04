@@ -58,7 +58,7 @@ with her account and ask Matt for collaborator access, or fork and PR.)
 ## 3. Sanity check the checkout (optional but cheap)
 
 ```bash
-cd ~/murmur/src-tauri && . "$HOME/.cargo/env" && cargo test    # expect ~38 tests green (slow first time — compiles whisper.cpp)
+cd ~/murmur/src-tauri && . "$HOME/.cargo/env" && cargo test    # expect 20 tests green (plus 30 in crates/murmur-core via `cargo test -p murmur-core`) (slow first time — compiles whisper.cpp)
 cd ~/murmur && npx vitest run                                  # expect ~24 tests green
 ```
 
