@@ -4,6 +4,12 @@ on:
   push:
   workflow_dispatch:
 
+# A new push to the same ref makes the in-flight run obsolete. The mobile job
+# holds a macOS runner for a long time, so cancel rather than queue.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     strategy:
@@ -37,3 +43,89 @@ jobs:
       - run: npm run build
       - run: cargo test --manifest-path src-tauri/Cargo.toml
       - run: cargo build --manifest-path src-tauri/Cargo.toml
+
+  # The phone shells: build murmur-core for the four mobile targets, then run
+  # each platform's own test command. No emulator — a JVM unit test cannot load
+  # the .so anyway, and the iOS tests do exercise the real FFI on the simulator.
+  mobile:
+    name: mobile (iOS + Android shells)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,aarch64-linux-android,x86_64-linux-android
+      - uses: Swatinem/rust-cache@v2
+
+      # Pinned: cargo-ndk picks the NDK toolchain paths, so a surprise upgrade
+      # would break the Android build with no code change.
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --version 4.1.2 --locked
+
+      # ---------------------------------------------------------------- iOS --
+
+      # apple/Murmur.xcodeproj is committed, so no XcodeGen here. The framework
+      # must exist BEFORE the first xcodebuild: Xcode resolves the MurmurCoreFFI
+      # binary target before any script phase runs.
+      - name: Build murmur-core for iOS
+        run: scripts/build-core-mobile.sh ios
+
+      # Don't hardcode a device name — the runner image's Xcode moves on and the
+      # names go with it. Take the first available iPhone.
+      - name: Pick an iPhone simulator
+        id: sim
+        run: |
+          name="$(xcrun simctl list devices available --json \
+            | jq -r '[.devices[][] | select(.name | startswith("iPhone"))] | .[0].name // empty')"
+          if [ -z "$name" ]; then
+            echo "no available iPhone simulator on this runner" >&2
+            xcrun simctl list devices available >&2
+            exit 1
+          fi
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "using simulator: $name"
+
+      - name: iOS tests (simulator)
+        env:
+          SIM_NAME: ${{ steps.sim.outputs.name }}
+        run: |
+          ios_test() {
+            xcodebuild -project apple/Murmur.xcodeproj -scheme Murmur \
+              -destination "platform=iOS Simulator,name=$SIM_NAME" test
+          }
+          # The simulator flakes on its first boot often enough to be worth one
+          # retry; a real test failure fails again the second time.
+          ios_test || {
+            echo "::warning::xcodebuild test failed — retrying once (simulator first-boot flake)"
+            ios_test
+          }
+
+      # ------------------------------------------------------------ Android --
+
+      - uses: actions/setup-java@v4
+        id: java
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0 ndk;27.2.12479018"
+
+      # build-core-mobile.sh defaults JAVA_HOME to Android Studio's bundled JBR,
+      # which does not exist on the runner. Setting both here means the script's
+      # `:=` defaults never apply, for it and for Gradle.
+      - name: Export Android toolchain env
+        run: |
+          echo "JAVA_HOME=${{ steps.java.outputs.path }}" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+
+      - name: Build murmur-core for Android
+        run: scripts/build-core-mobile.sh android
+
+      # assembleDebug re-runs the script through the buildRustCore task; that is
+      # cheap the second time and proves the Gradle wiring works.
+      - name: Android assemble + unit tests
+        working-directory: android
+        run: ./gradlew --no-daemon assembleDebug testDebugUnitTest

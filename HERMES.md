@@ -96,7 +96,7 @@ pop a Keychain dialog: **[HUMAN]** clicks **"Always Allow"** (once, forever).
 cd ~/murmur && . "$HOME/.cargo/env"
 APPLE_SIGNING_IDENTITY="Murmur Dev" npm run tauri build -- --debug
 # first build is long (whisper.cpp compile). Then:
-cp -R src-tauri/target/debug/bundle/macos/Murmur.app /Applications/
+cp -R target/debug/bundle/macos/Murmur.app /Applications/
 open /Applications/Murmur.app
 ```
 

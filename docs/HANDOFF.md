@@ -1,12 +1,79 @@
 # Murmur — Session Handoff
 
-**Last updated:** 2026-07-03 · main @ `3a65eb9` · pushed to https://github.com/mbartelt-bit/murmur (private)
-**Platform:** macOS-first. Tauri v2 (Rust core) + React/TS (Vite). Local-first, BYOK cloud optional.
+**Last updated:** 2026-09-04 · desktop trunk `3a65eb9` on `main`; mobile MM0 on `feat/mobile-core`
+· https://github.com/mbartelt-bit/murmur (private)
+**Platform:** macOS-first (Tauri v2 + React/TS), with iOS and Android shells on the shared
+`crates/murmur-core`. Local-first, BYOK cloud optional.
 
 > **Read the "Session 2 (2026-07-03)" block below first** — it captures everything since `274d61a`
 > (on-device dictation now WORKS, code-signing setup, the mic/hardened-runtime fix, fn-key
 > push-to-talk, HUD redesign). Sections farther down predate session 2 and are mostly still accurate
 > for architecture, but check the session-2 block for what changed.
+
+> **Mobile work lives in the "Mobile (MM0 landed 2026-09-04)" section directly below.** The Rust
+> pipeline now lives in a workspace crate shared by desktop, iOS and Android.
+
+---
+
+## Mobile (MM0 landed 2026-09-04)
+
+iOS and Android app **shells** exist and call the shared Rust core end to end. No dictation UI yet —
+MM0 is the plumbing. Read these two first:
+
+- Spec: `docs/superpowers/specs/2026-09-03-murmur-mobile-design.md` (sections 3, 4, 5, 11, 12, 13)
+- Plan: `docs/superpowers/plans/2026-09-03-murmur-mobile-mm0.md`
+- Per-platform detail: `apple/README.md`, `android/README.md`, `scripts/README.md`
+
+### Worktree convention
+Mobile branches are checked out as **git worktrees** at `~/murmur-wt/<branch>` (MM0 was
+`~/murmur-wt/mobile-core` on `feat/mobile-core`). `~/murmur` stays on the trunk and often holds
+uncommitted desktop work — never build a branch there.
+
+### Verification gate (run all of it before claiming a mobile change works)
+```bash
+cd ~/murmur-wt/<branch> && . "$HOME/.cargo/env"
+export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+export ANDROID_HOME="$HOME/Library/Android/sdk"
+
+cargo test --workspace --exclude murmur              # core tests (murmur needs dist/)
+npm run build && cargo test --manifest-path src-tauri/Cargo.toml \
+              && cargo build --manifest-path src-tauri/Cargo.toml
+npx vitest run
+scripts/build-core-mobile.sh ios && scripts/build-core-mobile.sh android
+xcodebuild -project apple/Murmur.xcodeproj -scheme Murmur \
+  -destination 'platform=iOS Simulator,name=iPhone 17' test   # simctl list devices available
+cd android && ./gradlew assembleDebug testDebugUnitTest
+```
+`.github/workflows/ci.yml` runs the same thing in a `mobile` job on `macos-latest`.
+
+### Where generated files go (all gitignored — never commit them)
+| Path | Produced by |
+|---|---|
+| `apple/Frameworks/MurmurCore.xcframework` | `scripts/build-core-mobile.sh ios` |
+| `apple/MurmurShared/Sources/MurmurCore/Generated/MurmurCore.swift` | same |
+| `android/app/src/main/jniLibs/{arm64-v8a,x86_64}/libmurmur_core.so` | `scripts/build-core-mobile.sh android` |
+| `android/app/src/main/java/app/murmur/core/murmur_core.kt` | same |
+| `target/uniffi/` | intermediates for both |
+
+Committed, by contrast: `apple/project.yml` **and** the generated `apple/Murmur.xcodeproj` (so a
+fresh clone builds without XcodeGen), plus the Gradle wrapper.
+
+### Gotchas
+- **The xcframework must exist before the FIRST `xcodebuild`.** Xcode resolves the `MurmurCoreFFI`
+  binary target *before* any script phase runs, so a clean checkout must run
+  `scripts/build-core-mobile.sh ios` by hand once. After that the app target's **Build MurmurCore**
+  pre-build phase keeps it fresh — but because the framework is unpacked before that phase, **a Rust
+  edit lands in the build *after* the one that rebuilt it.** Just edited `crates/murmur-core`? Build
+  twice, or re-run the script by hand.
+- **Gradle needs `cargo` on `PATH`.** The `buildRustCore` task shells out to the build script, and
+  Gradle (like Xcode) runs with a stripped `PATH` that lacks `~/.cargo/bin`. `. "$HOME/.cargo/env"`
+  in the shell you launch `./gradlew` from. Android also needs `cargo-ndk` and NDK `27.2.12479018`.
+- **`whisper` is desktop-only.** Both mobile modes build `--no-default-features` on purpose: the
+  `whisper` feature drags in cmake + whisper.cpp, which we do not cross-compile for phones. On-device
+  inference on mobile is deliberately deferred; phones use the cloud engines. Never "fix" a mobile
+  build by turning the feature on.
+- `murmur-core` holds **no state and no secrets** — no Tauri, no store, no Keychain. Callers pass a
+  `CloudConfig` in. Keep it that way; it is what makes the crate shareable across three front ends.
 
 ---
 
@@ -29,9 +96,9 @@ and the fn-key event tap. Build + launch the signed bundle instead:
 ```bash
 cd ~/murmur && . "$HOME/.cargo/env"
 APPLE_SIGNING_IDENTITY="Murmur Dev" npm run tauri build -- --debug
-open src-tauri/target/debug/bundle/macos/Murmur.app
+open target/debug/bundle/macos/Murmur.app
 # quit + relaunch one-liner:
-pkill -x murmur; sleep 1; open src-tauri/target/debug/bundle/macos/Murmur.app
+pkill -x murmur; sleep 1; open target/debug/bundle/macos/Murmur.app
 ```
 See the **Session 2** block for why the cert matters and what to do if it's missing. `--debug` reuses
 cached whisper objects (fast); drop it for an optimized release build.
@@ -48,13 +115,20 @@ npm run tauri dev          # compiles + launches; look for the menubar icon (no 
 - **Do NOT** run `tauri dev` from inside an automated/agent context — it's a long-running GUI process.
 
 ## Tests / build (what CI-equivalent looks like)
+The Rust side is a Cargo **workspace** now (`crates/murmur-core` + `src-tauri`), so build output
+lives in `./target/` at the repo root rather than under `src-tauri/`, and every cargo command
+runs from the repo root.
 ```bash
-cd src-tauri && . "$HOME/.cargo/env" && cargo test   # Rust: 38 tests
-cd ~/murmur && npx vitest run                          # JS: 24 tests (7 files)
-cd ~/murmur && npm run build                           # tsc + vite, builds index.html + hud.html
-cd src-tauri && cargo build                            # confirms native compile
+cd ~/murmur && . "$HOME/.cargo/env"
+cargo test -p murmur-core                          # Rust core: 30 tests
+npm run build                                      # tsc + vite; MUST precede any src-tauri cargo run
+cargo test --manifest-path src-tauri/Cargo.toml    # Rust desktop: 20 tests
+cargo build --manifest-path src-tauri/Cargo.toml   # confirms native compile
+npx vitest run                                     # JS: 24 tests (7 files)
 ```
-Green as of `3a65eb9` (Rust 38, JS 24 across 7 files). `cmake` is a host prereq (brew) for whisper.cpp.
+Green as of `c0c05fa` (Rust: murmur-core 30 + murmur 20; JS 24 across 7 files). `cmake` is a host
+prereq (brew) for whisper.cpp. `tauri::generate_context!` embeds `dist/` at compile time, which is
+why `npm run build` comes first. Mobile has its own gate — see the **Mobile** section above.
 
 ---
 
@@ -272,8 +346,8 @@ This is optional — a fresh session can work directly — but the pattern caugh
   but worth a Defer guard; consider `zeroize::Zeroizing` for the API key in `verify_provider`/cloud engines.
 - a11y: segmented-control keyboard nav lands on the hidden radio input (functional, could be nicer).
 - `Provider::id()` + `getSecret` ipc wrapper are dead code; reqwest `charset`/`json` features slightly gratuitous.
-- `.superpowers/` is NOT gitignored — SDD reports/diffs are committed (add to `.gitignore` if you want it clean).
-- `package.json` name is still `murmur-scaffold`; README is the Tauri scaffold default.
+- `.superpowers/` IS gitignored now (SDD reports/diffs stay local).
+- `package.json` name is `murmur`; `version` is `0.1.0` and is bumped by hand, not by any script.
 
 ## Roadmap (from the design spec, `docs/superpowers/specs/`)
 - **M3** Custom dictionary (names/jargon feeding STT prompt + cleanup) — biggest accuracy lift.
