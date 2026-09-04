@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("com.google.devtools.ksp")
 }
 
 android {
@@ -43,6 +44,12 @@ android {
     buildFeatures {
         compose = true
     }
+
+    testOptions {
+        // Robolectric needs the merged resources/manifest to boot an Android runtime
+        // for the DataStore, EncryptedSharedPreferences and Room tests.
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 dependencies {
@@ -57,11 +64,28 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     debugImplementation("androidx.compose.ui:ui-tooling")
 
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+    implementation("androidx.navigation:navigation-compose:2.8.5")
+
+    // Settings (never secrets) live in DataStore Preferences.
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+    // API keys live here and nowhere else (design spec section 10).
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+    // History is Room; the IME reads the same database from the same process.
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    ksp("androidx.room:room-compiler:2.6.1")
+
     // UniFFI's generated Kotlin binding talks to libmurmur_core.so through JNA.
     implementation("net.java.dev.jna:jna:5.15.0@aar")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("androidx.test:core:1.6.1")
+    testImplementation("androidx.room:room-testing:2.6.1")
 }
 
 // Rebuild the Rust core (jniLibs/*.so + the generated Kotlin binding) before every
