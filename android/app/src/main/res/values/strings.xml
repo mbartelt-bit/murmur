@@ -1,4 +1,144 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Every user-facing string in the app, in one place — the twin of iOS's `Copy.swift`, and for
+  the same two reasons: the keyboard has to say exactly what the app says, and the lines that
+  came from the desktop (`src/components/EngineSettings.tsx`) are copied verbatim so the Mac
+  and the phone stay one product. Anything marked *desktop* must not be reworded on its own.
+-->
 <resources>
     <string name="app_name">Murmur</string>
+
+    <!-- The keyboard, as the system keyboard list and the keyboard switcher name it. -->
+    <string name="ime_label">Murmur</string>
+
+    <!-- The status strip. One line, the desktop's and iOS's words. -->
+    <string name="ime_idle">Tap to speak</string>
+    <string name="ime_listening">Listening…</string>
+    <string name="ime_transcribing">Transcribing…</string>
+    <string name="ime_needs_permission">Open Murmur to allow the microphone</string>
+    <string name="ime_open_app">Open Murmur</string>
+    <string name="ime_try_on_device">Try on device</string>
+
+    <!-- The keys. No letters: Android hands the user back to their own keyboard. -->
+    <string name="ime_key_globe">Next keyboard</string>
+    <string name="ime_key_delete">Delete</string>
+    <string name="ime_key_space">Space</string>
+    <string name="ime_key_return">Return</string>
+    <!-- The space bar is the one key wide enough to say what it is in words. -->
+    <string name="ime_key_space_label">space</string>
+
+    <!-- Spoken by TalkBack on the big button. -->
+    <string name="ime_mic_start">Start listening</string>
+    <string name="ime_mic_stop">Stop listening</string>
+
+    <!-- ── App ──────────────────────────────────────────────────────────── -->
+    <string name="copied">Copied</string>
+    <string name="continue_label">Continue</string>
+
+    <!-- ── Tabs ─────────────────────────────────────────────────────────── -->
+    <string name="tab_home">Home</string>
+    <string name="tab_history">History</string>
+    <string name="tab_settings">Settings</string>
+
+    <!-- ── Onboarding ───────────────────────────────────────────────────── -->
+    <string name="welcome_title">Welcome to Murmur</string>
+    <string name="welcome_subtitle">Speak, and Murmur writes it down — cleaned up, on your phone.</string>
+
+    <string name="mic_step_title">Microphone</string>
+    <string name="mic_step_body">Murmur needs the microphone to hear you. Nothing is recorded until you start a dictation.</string>
+    <string name="mic_allow">Allow microphone</string>
+    <string name="permission_pending">Not allowed yet.</string>
+    <string name="mic_granted">Microphone allowed.</string>
+    <string name="mic_denied">Microphone access is off. Turn it on in Settings to dictate.</string>
+
+    <string name="engine_step_title">Choose an engine</string>
+    <!-- *desktop* — the steering line under the transcription segmented control. -->
+    <string name="engine_step_body">Local is free &amp; private. Groq is free in the cloud (no card). OpenAI is paid but most accurate.</string>
+    <string name="local_ready">On-device speech is ready.</string>
+    <string name="local_unavailable">On-device speech isn\'t available for your language. Pick Groq or OpenAI.</string>
+
+    <string name="keyboard_step_title">Turn on the Murmur keyboard</string>
+    <string name="keyboard_step_body">The keyboard is how Murmur types into every other app. Add it once, in Settings.</string>
+    <!-- Android's own path, in the words its Settings app uses. -->
+    <string name="keyboard_step_path">System → Languages &amp; input → On-screen keyboard → Manage keyboards → Murmur</string>
+    <string name="keyboard_open_settings">Open keyboard settings</string>
+    <string name="keyboard_step_done">The Murmur keyboard is on.</string>
+    <string name="keyboard_step_waiting">Not added yet — Murmur keeps checking.</string>
+    <string name="keyboard_picker_line">Then pick Murmur from the keyboard switcher</string>
+    <string name="keyboard_show_picker">Show keyboard picker</string>
+
+    <string name="test_step_title">Try it</string>
+    <string name="test_step_body">Tap the field below, switch to Murmur with the keyboard picker, and say one sentence. Murmur cleans it up and saves it to History.</string>
+    <string name="test_step_placeholder">Say something here</string>
+    <string name="test_it">Try it</string>
+    <string name="finish">Finish</string>
+
+    <!-- ── Engines (desktop wording, cost badge folded into the label) ───── -->
+    <string name="stt_local">Local · Free</string>
+    <string name="stt_groq">Groq · Free tier</string>
+    <string name="stt_openai">OpenAI · Paid</string>
+    <string name="cleanup_rule">Rules · Free</string>
+    <string name="cleanup_groq">Groq</string>
+    <string name="cleanup_openai">OpenAI</string>
+
+    <!-- ── Provider keys (desktop wording) ──────────────────────────────── -->
+    <string name="connect_provider">Connect %1$s</string>
+    <string name="key_field_placeholder">%1$s API key</string>
+    <string name="get_api_key">Get your API key ↗</string>
+    <string name="connect">Connect</string>
+    <string name="connecting">Connecting…</string>
+    <string name="verify">Verify</string>
+    <string name="verifying">Verifying…</string>
+    <string name="connected">✓ Connected</string>
+    <string name="key_saved">Key saved</string>
+    <string name="remove_key">Remove key</string>
+
+    <!-- ── Home ─────────────────────────────────────────────────────────── -->
+    <string name="try_dictation">Try dictation</string>
+    <string name="recent_title">Recent</string>
+    <string name="no_dictations_yet">No dictations yet. Tap Try dictation to make your first one.</string>
+    <string name="tap_to_copy">Tap a dictation to copy it.</string>
+
+    <string name="chip_mic">Microphone</string>
+    <string name="chip_keyboard">Keyboard</string>
+    <string name="chip_engine">Engine</string>
+    <string name="chip_allowed">Allowed</string>
+    <string name="chip_tap_to_allow">Tap to allow</string>
+    <string name="chip_on">On</string>
+    <string name="chip_off">Off</string>
+
+    <string name="engine_summary_local">Local · on device</string>
+    <string name="engine_summary_connected">%1$s · connected</string>
+    <string name="engine_summary_no_key">%1$s · no key</string>
+    <string name="engine_name_local">Local</string>
+    <string name="engine_name_groq">Groq</string>
+    <string name="engine_name_openai">OpenAI</string>
+
+    <!-- ── Settings ─────────────────────────────────────────────────────── -->
+    <string name="transcription_section">Transcription</string>
+    <string name="cleanup_section">Cleanup</string>
+    <string name="auto_listen_toggle">Start listening when the keyboard opens</string>
+    <string name="return_keyboard_toggle">Return to your keyboard after dictating</string>
+    <string name="auto_stop_toggle">Stop automatically when you pause</string>
+    <string name="clipboard_toggle">Copy dictations to the clipboard</string>
+    <!-- Android-only: the keyboard commits straight into the field, so unlike iOS the
+         clipboard is a spare copy rather than the way the text arrives. -->
+    <string name="clipboard_footer">The keyboard types straight into the field, so this only keeps a spare copy.</string>
+    <string name="about_section">About</string>
+    <string name="version_row">Version</string>
+
+    <!-- ── History ──────────────────────────────────────────────────────── -->
+    <string name="search_placeholder">Search dictations</string>
+    <string name="history_empty">No dictations yet.</string>
+    <string name="history_no_matches">No matches.</string>
+    <string name="delete">Delete</string>
+    <string name="show_raw">Show raw</string>
+    <string name="hide_raw">Hide raw</string>
+    <string name="source_in_app">In app</string>
+    <string name="source_keyboard">Keyboard</string>
+
+    <!-- ── In-app dictation ─────────────────────────────────────────────── -->
+    <string name="recorder_title">Try dictation</string>
+    <string name="recorder_done">Done</string>
+    <string name="recorder_placeholder">Your words land here.</string>
 </resources>

@@ -32,7 +32,7 @@ Plus the emulator run in Task 5 and the device gates in Task 6.
 
 ---
 
-## Task 1 — Foundations: settings, secrets, history, pipeline
+## Task 1 ✅ `273f25d` — Foundations: settings, secrets, history, pipeline
 
 **Files (create), all under `android/app/src/main/java/com/murmur/app/`:** `data/Settings.kt`, `data/SettingsStore.kt` (DataStore Preferences), `data/SecretStore.kt` (`interface SecretStore`, `EncryptedSecretStore`, `InMemorySecretStore`), `data/history/TranscriptEntity.kt`, `data/history/TranscriptDao.kt`, `data/history/HistoryDatabase.kt`, `data/history/HistoryStore.kt`, `engine/SpeechEngine.kt` (interface + `PipelineError`), `engine/DictationPipeline.kt`, `di/AppGraph.kt` (a hand-rolled singleton graph — no Hilt).
 **Tests:** `android/app/src/test/java/com/murmur/app/{SettingsStoreTest,SecretStoreTest,HistoryStoreTest,DictationPipelineTest}.kt` (Robolectric for the two that touch Room/DataStore).
@@ -67,7 +67,7 @@ class DictationPipeline(settings: SettingsStore, secrets: SecretStore, history: 
 
 ---
 
-## Task 2 — Audio: recorder, silence detector, local + cloud engines, permissions
+## Task 2 ✅ `586ae4d` — Audio: recorder, silence detector, local + cloud engines, permissions
 
 **Files (create):** `audio/AudioRecorder.kt` (`AudioRecord`, `MediaRecorder.AudioSource.VOICE_RECOGNITION`, 16 kHz mono PCM16 → Float, RMS levels), `audio/SilenceDetector.kt` (pure; same constants as iOS: threshold 0.015, hangover 1.5 s, minSpeech 0.4 s), `engine/LocalSpeechEngine.kt`, `engine/CloudSpeechEngine.kt`, `engine/SpeechEngines.kt` (`local(context)`, `cloud(cfg)`, `isLocalAvailable(context)`: `SpeechRecognizer.isOnDeviceRecognitionAvailable` on 31+, else `isRecognitionAvailable`), `Permissions.kt` (`hasRecordAudio`, `openAppSettings`).
 **Tests:** `SilenceDetectorTest` (same three cases as iOS), `CloudSpeechEngineTest` (fake core call receives the concatenated samples), `LocalSpeechEngineTest` (Robolectric: a fake `SpeechRecognizer` is not feasible — test the result/partial/error mapping through the engine's `RecognitionListener` implementation directly by invoking its callbacks: `onPartialResults` → partial, `onResults` → return, `ERROR_NO_MATCH`/`ERROR_SPEECH_TIMEOUT` → `""`, other errors → `PipelineError.NoSpeechEngine` or a message).
@@ -78,7 +78,7 @@ class DictationPipeline(settings: SettingsStore, secrets: SecretStore, history: 
 
 ---
 
-## Task 3 — The input method
+## Task 3 ✅ `8605789` — The input method
 
 **Files (create):** `ime/MurmurInputMethodService.kt`, `ime/ImeController.kt`, `ime/ImeView.kt` (Compose), `ime/ComposeInputView.kt` (an `AbstractComposeView` subclass that installs `LifecycleOwner`/`ViewModelStoreOwner`/`SavedStateRegistryOwner` on the view tree — required for Compose inside an `InputMethodService`; implement the three owners on the service), `res/xml/method.xml`, `res/values/strings.xml` additions.
 **Modify:** `AndroidManifest.xml` — `<service android:name=".ime.MurmurInputMethodService" android:permission="android.permission.BIND_INPUT_METHOD" android:exported="true" android:label="@string/ime_label"> <intent-filter><action android:name="android.view.InputMethod"/></intent-filter> <meta-data android:name="android.view.im" android:resource="@xml/method"/> </service>`; `<uses-permission android:name="android.permission.RECORD_AUDIO"/>`. `method.xml`: `<input-method android:settingsActivity="com.murmur.app.MainActivity" android:supportsSwitchingToNextInputMethod="true" android:isDefault="false"/>`.
@@ -105,7 +105,7 @@ class ImeController(settings: SettingsStore, pipeline: DictationPipeline, sessio
 
 ---
 
-## Task 4 — App screens: onboarding, home, settings, history
+## Task 4 ✅ `3bccb99` — App screens: onboarding, home, settings, history
 
 **Files (create):** `ui/RootNav.kt` (NavHost: onboarding until `onboardingComplete`, then bottom nav Home · History · Settings), `ui/theme/MurmurTheme.kt`, `ui/onboarding/{OnboardingViewModel,OnboardingScreen}.kt`, `ui/home/{HomeViewModel,HomeScreen}.kt` (replaces the MM0 shell), `ui/settings/{EngineSettingsViewModel,SettingsScreen,ProviderKeySection}.kt`, `ui/history/{HistoryViewModel,HistoryScreen}.kt`, `ui/components/{StatusChip,Card}.kt`, `KeyboardStatus.kt` (`isEnabled(context)` via `InputMethodManager.enabledInputMethodList` matching our service; `openImeSettings(context)` = `ACTION_INPUT_METHOD_SETTINGS`; `showImePicker(context)` = `InputMethodManager.showInputMethodPicker()`), `ui/recorder/{RecorderViewModel,RecorderScreen}.kt` (the in-app "Try dictation" — same phases as the IME controller but committing into an on-screen `TextField`; reuse `ImeController` with a `TextSink` backed by Compose state).
 **Modify:** `MainActivity.kt` (handles `EXTRA_REQUEST_MIC` by jumping to the mic permission step), delete `HomeScreen.kt`'s MM0 body, keep `formatCleaned` test or replace it.
@@ -117,7 +117,7 @@ Copy is the desktop's, verbatim, as on iOS. Settings toggles: "Start listening w
 
 ---
 
-## Task 5 — Emulator run-through + Play internal-testing build
+## Task 5 ✅ `ea14c2f` — Emulator run-through + Play internal-testing build
 
 **Files (create):** `scripts/android-play-upload.sh` (bash: `./gradlew bundleRelease` then `node scripts/play-upload.mjs --aab android/app/build/outputs/bundle/release/app-release.aab --package com.murmur.app --track internal --status completed`), `scripts/play-upload.mjs` (adapted from `~/sober-navigator-appstore/scripts/play-upload.mjs` — same Google Play Developer API v3 edits flow with `googleapis`, parameterised by `--package`; service account JSON path from `PLAY_SERVICE_ACCOUNT` env, default `~/arkhe-android-signing/play-service-account.json`; never commit a key), `android/keystore.properties.example`, `android/README.md` (release section).
 **Modify:** `android/app/build.gradle.kts` — `signingConfigs.release` reading `android/keystore.properties` (gitignored: `storeFile`, `storePassword`, `keyAlias`, `keyPassword`), `buildTypes.release { isMinifyEnabled = true; proguard rules keeping JNA + `app.murmur.core` }`, `versionCode` from `MURMUR_VERSION_CODE` env (default 1), `versionName "0.1.0"`; add `android/app/proguard-rules.pro`.
@@ -134,7 +134,7 @@ Copy is the desktop's, verbatim, as on iOS. Settings toggles: "Start listening w
 
 ---
 
-## Task 6 — Device gates + docs
+## Task 6 ✅ (docs landed; device gates + Play app record pending Matt) — Device gates + docs
 
 **Files (modify):** `android/README.md`, `docs/HANDOFF.md` (MM3 section), this plan (tick tasks).
 

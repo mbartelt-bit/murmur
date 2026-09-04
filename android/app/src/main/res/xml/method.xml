@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The input method's declaration. `settingsActivity` is what puts a settings cog next to
+  Murmur in the system keyboard list; `supportsSwitchingToNextInputMethod` is what lets the
+  keyboard hand the user back to Gboard when a dictation lands (design spec section 7.1).
+-->
+<input-method xmlns:android="http://schemas.android.com/apk/res/android"
+    android:isDefault="false"
+    android:settingsActivity="com.murmur.app.MainActivity"
+    android:supportsSwitchingToNextInputMethod="true" />
