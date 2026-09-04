@@ -448,6 +448,27 @@ final class RecorderViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func testAnActionButtonRequestHandsOffButShowsNoSwipeBackHint() async {
+        let audio = FakeAudio()
+        audio.chunks = speechThenSilence()
+        let model = makeModel(
+            request: DictationRequest(session: Handoff.intentSession, source: .actionButton),
+            audio: audio,
+            engine: FakeEngine("hello there")
+        )
+
+        await model.start()
+
+        // The user came from the Lock Screen or the Home Screen — there is no host app behind
+        // Murmur to swipe back to — but the text still goes to the App Group so a Murmur
+        // keyboard can insert it on its next appearance (spec §6.3).
+        XCTAssertFalse(model.showsSwipeBackHint)
+        let result = Handoff.takeResult(for: Handoff.intentSession, defaults: defaults)
+        XCTAssertEqual(result?.clean, "Clean: hello there")
+        XCTAssertEqual(try? history.list().first?.source, .actionButton)
+    }
+
+    @MainActor
     func testAnInAppRequestWritesNoHandoffResult() async {
         // A result left over from an earlier round trip must survive an in-app dictation.
         let other = UUID()

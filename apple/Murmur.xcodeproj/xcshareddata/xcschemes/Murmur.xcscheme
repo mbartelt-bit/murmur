@@ -29,6 +29,20 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
+               BlueprintIdentifier = "5A6A605C58C5118F157CC9BB"
+               BuildableName = "MurmurControls.appex"
+               BlueprintName = "MurmurControls"
+               ReferencedContainer = "container:Murmur.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
                BlueprintIdentifier = "2CD9C75CD1C959165234AEAC"
                BuildableName = "MurmurKeyboard.appex"
                BlueprintName = "MurmurKeyboard"

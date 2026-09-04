@@ -94,8 +94,14 @@ final class RecorderViewModel: ObservableObject {
         self.sleeper = sleeper
     }
 
-    /// `true` when this dictation was requested by the keyboard, which is waiting for the text.
-    var showsSwipeBackHint: Bool { request.session != nil }
+    /// `true` only when the keyboard sent the user here, because only then is there a host app
+    /// to swipe back to.
+    ///
+    /// A session id alone is not enough: an Action Button, Shortcut or Control Center dictation
+    /// also carries one (``Handoff/intentSession``, so a Murmur keyboard can still pick the text
+    /// up on its next appearance) but the user came from the Home Screen, the Lock Screen or
+    /// Siri, and telling them to swipe back would point at nothing.
+    var showsSwipeBackHint: Bool { request.session != nil && request.source == .keyboard }
 
     /// How long the finished text stays on screen before the sheet closes itself.
     var autoDismissAfter: TimeInterval { 8 }

@@ -35,8 +35,15 @@ targets:
         product: MurmurKeyboardCore
       - package: MurmurShared
         product: MurmurKeyboardUI
-      # Embeds MurmurKeyboard.appex into Murmur.app/PlugIns.
+      # App Intents defined in a package only run in-process — which `openAppWhenRun` needs —
+      # when the app itself links them. (The AppShortcutsProvider is a step further and has to
+      # be compiled into the app module itself: see apple/Murmur/MurmurShortcuts.swift.)
+      - package: MurmurShared
+        product: MurmurIntents
+      # Embeds MurmurKeyboard.appex and MurmurControls.appex into Murmur.app/PlugIns.
       - target: MurmurKeyboard
+        embed: true
+      - target: MurmurControls
         embed: true
     settings:
       base:
@@ -152,6 +159,44 @@ targets:
             IsASCIICapable: false
             PrefersRightToLeft: false
 
+  # The Control Center / Lock Screen button (design spec §6.3). A widget extension with one
+  # ControlWidget in it and nothing else: it links MurmurIntents and MurmurSharedBase, never
+  # MurmurShared or MurmurCore, for the same reason the keyboard does not.
+  MurmurControls:
+    type: app-extension
+    platform: iOS
+    sources:
+      - MurmurControls
+    dependencies:
+      - package: MurmurShared
+        product: MurmurIntents
+      - package: MurmurShared
+        product: MurmurSharedBase
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.murmur.app.controls
+        GENERATE_INFOPLIST_FILE: NO
+        # Extensions ship inside the app, never on their own.
+        SKIP_INSTALL: YES
+        TARGETED_DEVICE_FAMILY: "1,2"
+    entitlements:
+      # Only the App Group: the intent writes one flag there and nothing else. No keychain
+      # group — the control reads no API keys.
+      path: MurmurControls/MurmurControls.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.murmur.app
+    info:
+      path: MurmurControls/Info.plist
+      properties:
+        CFBundleDisplayName: Murmur
+        # Must match the app's, or the App Store rejects the upload.
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        NSExtension:
+          # A SwiftUI WidgetBundle needs no principal class: @main is the entry point.
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+
   MurmurTests:
     type: bundle.unit-test
     platform: iOS
@@ -170,6 +215,7 @@ schemes:
       targets:
         Murmur: all
         MurmurKeyboard: all
+        MurmurControls: all
     run:
       config: Debug
     test:

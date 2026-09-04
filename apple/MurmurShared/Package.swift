@@ -21,13 +21,20 @@ import PackageDescription
 //   MurmurKeyboardUI — the extension's SwiftUI views (KeyboardView, KeyCap, StatusStrip). A
 //                    library rather than files in the extension target so the app-hosted
 //                    MurmurTests can instantiate the view and catch layout crashes.
+//   MurmurIntents  — DictateIntent, shared by the app (which must link it for
+//                    `openAppWhenRun` to run perform() in-process) and by the MurmurControls
+//                    widget extension, which is where the Control Center button lives. The
+//                    AppShortcutsProvider that points at it cannot live here — see
+//                    apple/Murmur/MurmurShortcuts.swift.
 //
 // LINK GRAPH RULE: the MurmurKeyboard extension links MurmurKeyboardUI, MurmurKeyboardCore
-// and MurmurSharedBase — never MurmurShared and never MurmurCore. A keyboard may not record
+// and MurmurSharedBase — never MurmurShared and never MurmurCore. The MurmurControls widget
+// extension links MurmurIntents and MurmurSharedBase — same rule. A keyboard may not record
 // (design spec §6.1, App Store guideline 4.4.1) and has roughly a 50–70 MB ceiling
-// (§2 constraint 5), so nothing under Sources/MurmurKeyboardCore, Sources/MurmurKeyboardUI
-// or Sources/MurmurSharedBase may import MurmurCore, AVFoundation, Speech, or GRDB: the Rust
-// core and the audio/speech files stay out of the extension's address space entirely.
+// (§2 constraint 5), so nothing under Sources/MurmurKeyboardCore, Sources/MurmurKeyboardUI,
+// Sources/MurmurIntents or Sources/MurmurSharedBase may import MurmurCore, AVFoundation,
+// Speech, or GRDB: the Rust core and the audio/speech files stay out of both extensions'
+// address spaces entirely.
 //
 // GRDB backs the transcripts history in the App Group container. Its own Package.swift
 // declares swift-tools-version 6.1, which Xcode 26.6 satisfies; ours stays at 5.9 so our
@@ -39,7 +46,8 @@ let package = Package(
         .library(name: "MurmurShared", targets: ["MurmurShared"]),
         .library(name: "MurmurSharedBase", targets: ["MurmurSharedBase"]),
         .library(name: "MurmurKeyboardCore", targets: ["MurmurKeyboardCore"]),
-        .library(name: "MurmurKeyboardUI", targets: ["MurmurKeyboardUI"])
+        .library(name: "MurmurKeyboardUI", targets: ["MurmurKeyboardUI"]),
+        .library(name: "MurmurIntents", targets: ["MurmurIntents"])
     ],
     dependencies: [
         .package(url: "https://github.com/groue/GRDB.swift", from: "7.11.1")
@@ -76,6 +84,11 @@ let package = Package(
             name: "MurmurKeyboardUI",
             dependencies: ["MurmurKeyboardCore", "MurmurSharedBase"],
             path: "Sources/MurmurKeyboardUI"
+        ),
+        .target(
+            name: "MurmurIntents",
+            dependencies: ["MurmurSharedBase"],
+            path: "Sources/MurmurIntents"
         )
     ]
 )
