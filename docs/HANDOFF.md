@@ -103,6 +103,36 @@ Facts a new session needs:
 
 ---
 
+## iOS keyboard + triggers (MM2 landed 2026-09-04) — branch `feat/mobile-mm2`, PR #4 (stacked on #3)
+
+Dictate into any app on iPhone. Landed: a real three-page keyboard extension whose mic key
+hands off to the app and inserts the result on return (`MurmurKeyboard/`, logic in
+`MurmurKeyboardCore`, UI in `MurmurKeyboardUI`); the "Dictate with Murmur" App Intent + App
+Shortcuts (Action Button, Back Tap, Siri) and an iOS 18 Control Center button
+(`MurmurControls/` widget extension); onboarding steps that get the keyboard enabled and explain
+the triggers; a crash-safe recording journal ("Finish last dictation?"); and
+`scripts/ios-testflight.sh`. 216 XCTest cases. Plan: `docs/superpowers/plans/2026-09-04-murmur-mobile-mm2.md`;
+details + the device checklist: `apple/README.md`.
+
+Facts a new session needs:
+- **Link-graph rule:** the extensions link `MurmurSharedBase`/`MurmurKeyboardCore`/
+  `MurmurKeyboardUI`/`MurmurIntents` only — never `MurmurShared` or `MurmurCore`. `nm` on both
+  `.appex` binaries shows zero core symbols. `Settings.swift` lives in `MurmurSharedBase`; the
+  `ProviderId.core` mapping is in `MurmurShared/ProviderId+Core.swift` so the base stays core-free.
+- **`AppShortcutsProvider` must be a source file of the app target**, not the package — the
+  metadata processor only takes `autoShortcuts` from the app module (verified in
+  `Metadata.appintents/extract.actionsdata`).
+- **Cold-launch intents need `.task { consumeLaunchFlag() }`** as well as
+  `onChange(of: scenePhase)`; the scene is already active when the body first appears.
+- **App Review 4.4.1** is documented in `apple/README.md`; the keyboard's containing-app launch is
+  the known risk, the intent/Control Center paths are the fallback.
+- **The simulator cannot record** (CoreAudio deadlocks and aborts ~9 s after the mic grant on this
+  Mac). Everything audio is unit-tested with fakes and verified on a device only.
+- **TestFlight prerequisites are Matt's:** the App Store Connect app record, one device build from
+  Xcode to register identifiers/App Group, and the ASC API key env (`ASC_KEY_ID`, `ASC_ISSUER_ID`).
+
+---
+
 ## What Murmur is
 A macOS menubar voice-dictation app (a Wispr Flow alternative). Hold a hotkey, speak, and it
 transcribes (local Whisper **or** cloud), cleans the text up, and pastes it at your cursor. No Dock
