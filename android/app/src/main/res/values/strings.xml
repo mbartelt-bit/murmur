@@ -1,4 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Murmur</string>
+
+    <!-- The keyboard, as the system keyboard list and the keyboard switcher name it. -->
+    <string name="ime_label">Murmur</string>
+
+    <!-- The status strip. One line, the desktop's and iOS's words. -->
+    <string name="ime_idle">Tap to speak</string>
+    <string name="ime_listening">Listening…</string>
+    <string name="ime_transcribing">Transcribing…</string>
+    <string name="ime_needs_permission">Open Murmur to allow the microphone</string>
+    <string name="ime_open_app">Open Murmur</string>
+    <string name="ime_try_on_device">Try on device</string>
+
+    <!-- The keys. No letters: Android hands the user back to their own keyboard. -->
+    <string name="ime_key_globe">Globe</string>
+    <string name="ime_key_delete">Delete</string>
+    <string name="ime_key_space">Space</string>
+    <string name="ime_key_return">Return</string>
+
+    <!-- Spoken by TalkBack on the big button. -->
+    <string name="ime_mic_start">Start listening</string>
+    <string name="ime_mic_stop">Stop listening</string>
 </resources>

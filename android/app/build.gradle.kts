@@ -65,6 +65,10 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+    // The input method has no activity, so it installs the three view-tree owners Compose
+    // needs by hand (see ime/ComposeInputView.kt) — these two carry the setters.
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7")
+    implementation("androidx.savedstate:savedstate-ktx:1.2.1")
     implementation("androidx.navigation:navigation-compose:2.8.5")
 
     // Settings (never secrets) live in DataStore Preferences.
