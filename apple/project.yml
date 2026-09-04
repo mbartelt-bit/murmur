@@ -27,6 +27,11 @@ targets:
       - Murmur
     dependencies:
       - package: MurmurShared
+        product: MurmurShared
+      # The keyboard extension (MM2 Task 2) is what really needs MurmurKeyboardCore; the app
+      # links it too so MurmurTests — which are hosted by the app — can import it.
+      - package: MurmurShared
+        product: MurmurKeyboardCore
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.murmur.app
