@@ -1,7 +1,7 @@
 # Murmur Mobile — iOS + Android Design
 
 **Date:** 2026-09-03
-**Status:** Design for review (architectural path). Scope approved by Matt: both platforms, iOS first, published under ARKHE Software, LLC (Apple team `X9PU63GUAN`).
+**Status:** Approved by Matt 2026-09-03 after a second review pass. Both platforms, iOS first, fully native mobile apps on a shared Rust core, published under ARKHE Software, LLC (Apple team `X9PU63GUAN`).
 **Builds on:** `docs/superpowers/specs/2026-06-27-murmur-dictation-app-design.md` (the macOS product) and `docs/HANDOFF.md` (current code).
 
 ## 1. Summary
@@ -14,13 +14,15 @@ The mobile product has three surfaces per platform:
 
 | Surface | iOS | Android |
 |---|---|---|
-| Containing app (settings, engines, keys, history, onboarding) | Tauri 2 + existing React UI | Tauri 2 + existing React UI |
+| Containing app (onboarding, engines, keys, history, settings) | Native SwiftUI app | Native Kotlin + Jetpack Compose app |
 | Recording surface (where the mic actually runs) | Native SwiftUI screen inside the containing app | Native Kotlin view inside the keyboard itself |
 | Text-insertion surface | Custom keyboard extension (voice-first) + Action Button App Intent | Custom keyboard (input method service, voice-first) |
 
 Everything that turns audio into clean text — cloud STT, cleanup, provider config, WAV
 encoding, resampling — is extracted from the Tauri crate into a **`murmur-core` Rust library**
-and exposed to Swift and Kotlin through UniFFI. macOS keeps using the same crate.
+and exposed to Swift and Kotlin through UniFFI. macOS keeps using the same crate. The React UI
+stays desktop-only: the phone apps are native because every surface that matters on a phone
+(recording, keyboard, input method, secure storage, permissions) has to be native anyway.
 
 ### Non-negotiables carried over from the product spec
 - **Local-first and free by default.** On phones the free local engine is the platform's own
@@ -44,9 +46,10 @@ These are hard facts verified on 2026-09-03; the design does not fight them.
    your app" screen. Murmur does the same and never uses private APIs. Source: thread 826851.
 3. **Android input methods may record audio themselves** (this is how Gboard voice typing works),
    so no app switch is needed on Android.
-4. **Tauri regenerates the Xcode project only on `tauri ios init`**, from an XcodeGen `project.yml`.
-   `bundle.iOS.template` in `tauri.conf.json` points at a custom template, which is how the
-   keyboard extension target is added. `xcodegen` must be installed (`brew install xcodegen`).
+4. **The phone apps are plain Xcode and Gradle projects, not Tauri-generated.** Tauri 2 can
+   target iOS/Android, but the iOS round trip needs the app to open and be listening in well
+   under a second, which a web view cold start works against, and the only thing Tauri would have
+   reused is four settings screens. Decided with Matt on 2026-09-03.
 5. **Keyboard extensions have roughly a 50–70 MB memory ceiling.** No model loading in the
    extension, ever. The extension only draws UI and inserts text.
 6. **App Review guideline 4.4.1** (verified 2026-09-03 at developer.apple.com/app-store/review/guidelines)
@@ -64,21 +67,19 @@ These are hard facts verified on 2026-09-03; the design does not fight them.
 
 ```
 murmur/
-  crates/
-    murmur-core/          # NEW: engines, providers, wav, resample, cleanup rules; UniFFI exports
-  src-tauri/              # desktop + mobile containing app (Tauri). Depends on murmur-core.
-    src/                  # macOS/Windows-specific code stays here (hotkey, ptt_key, insert, …)
-    gen/apple/            # generated once; committed; contains the Keyboard extension target
-    gen/android/          # generated once; committed; contains the IME
-    ios-template/project.yml   # custom XcodeGen template (adds MurmurKeyboard target + App Group)
-    tauri-plugin-murmur-native/  # in-repo Tauri mobile plugin: Swift + Kotlin (secrets, speech, permissions)
+  Cargo.toml                # workspace: crates/murmur-core + src-tauri
+  crates/murmur-core/       # NEW: engines, providers, wav, resample, cleanup rules; UniFFI exports
+  src-tauri/                # desktop app (macOS/Windows); behaviour unchanged; depends on murmur-core
+  src/                      # React UI, desktop only (unchanged)
   apple/
-    MurmurKeyboard/       # Swift keyboard extension sources
-    MurmurShared/         # Swift package: App Group handoff codec, Keychain access-group wrapper
-    MurmurRecorder/       # SwiftUI recording screen + AppIntent (linked into the containing app)
+    Murmur.xcodeproj        # targets: Murmur (app), MurmurKeyboard (extension), MurmurTests, MurmurKeyboardTests
+    Murmur/                 # SwiftUI app: onboarding, home, settings, history, recorder, App Intents, Control widget
+    MurmurKeyboard/         # keyboard extension (UIInputViewController + key layout)
+    MurmurShared/           # Swift package: App Group handoff, Keychain wrapper, settings model, generated UniFFI bindings
+    Frameworks/MurmurCore.xcframework   # build output (gitignored)
   android/
-    ime/                  # Kotlin: MurmurInputMethodService + voice view + state machine
-  src/                    # React UI, now responsive (desktop window + phone)
+    settings.gradle.kts, app/   # one module: Compose app + MurmurInputMethodService; jniLibs + generated Kotlin binding
+  scripts/build-core-mobile.sh  # cargo builds for the 4 mobile targets, uniffi-bindgen, xcframework + jniLibs
 ```
 
 `Cargo.toml` at the repo root becomes a workspace (`crates/murmur-core`, `src-tauri`).
@@ -119,52 +120,52 @@ pub fn key_page_url(p: Provider) -> String;
   `murmur-core`. Desktop behaviour must not change; the existing 38 Rust tests move with the code.
 
 **Bindings build:** `uniffi-bindgen` generates `murmur_core.swift` + a modulemap into
-`apple/MurmurShared/Generated/` and `uniffi/murmur/core.kt` into `android/ime/src/main/java/`.
+`apple/MurmurShared/Generated/` and `uniffi/murmur/core.kt` into `android/app/src/main/java/`.
 An XCFramework (`MurmurCore.xcframework`, targets `aarch64-apple-ios` +
 `aarch64-apple-ios-sim`) and an Android `.so` per ABI (`aarch64-linux-android`,
 `x86_64-linux-android` for the emulator) are produced by `scripts/build-core-mobile.sh`.
-These are build outputs, gitignored, and rebuilt by the Xcode/Gradle build phases.
+These are build outputs, gitignored, and rebuilt by an Xcode Run Script phase and a Gradle
+`buildRustCore` task (via `cargo-ndk`), so `xcodebuild` and `./gradlew` are the only entry points.
 
-## 5. Containing app (Tauri 2 on iOS and Android)
+## 5. Containing apps (native)
 
-- Generated with `tauri ios init` / `tauri android init`. Identifier stays `com.murmur.app`.
-- The existing React screens are reused. `App.tsx` gains a phone layout: a single scrolling
-  column, 100 % width cards, a top tab bar (Home · History · Settings) on mobile only, detected by
-  `navigator.userAgent` at startup via a `platform` value exported from a new
-  `src/lib/platform.ts` (`"macos" | "windows" | "ios" | "android"`), sourced from a Tauri command.
-- Desktop-only components are not rendered on mobile: `HotkeySetting`, the fn-key badge, the
-  Accessibility/Input Monitoring onboarding steps.
-- **Mobile onboarding** (new `src/components/MobileOnboarding.tsx`), in order:
-  1. Microphone (request via native plugin; deep-link to Settings if denied).
-  2. Speech recognition permission (iOS only; needed by the local engine).
-  3. Engine: **Local (free, on-device)** is preselected and needs nothing. Groq/OpenAI reuse
-     `EngineSettings` unchanged (key entry, Get-your-key link, live verify).
-  4. Enable the keyboard: an illustrated step that deep-links to the platform keyboard settings
-     and polls until Murmur is enabled (iOS: also requires **Allow Full Access**, with the honest
-     one-line reason: "so the keyboard can read your dictation from Murmur and your keys").
-  5. iOS only, optional: **Action Button** step shown on iPhone 15 Pro and newer, linking to
-     Settings → Action Button with the "Murmur: Dictate" shortcut preselected.
-  6. Test dictation: an in-app "Try it" field that runs the full pipeline.
-- **History** reuses `HistoryList` and the existing SQLite schema; the mobile path appends a
-  `source` column (`"keyboard" | "action-button" | "in-app"`) via migration v2.
+Both apps have the same four screens and the same visual language as the desktop settings
+window (`src/index.css` tokens: system font, indigo accent `#6366f1`, light/dark from the system).
 
-### `tauri-plugin-murmur-native` (in-repo mobile plugin, Swift + Kotlin)
-Commands the React UI calls on mobile, replacing the macOS-only ones in `permissions.rs` /
-`secrets.rs`:
+| Screen | Content |
+|---|---|
+| **Onboarding** | Stepper, one step per screen, each with a single primary button; see order below. |
+| **Home** | Big "Try dictation" button (runs the full pipeline into an on-screen field), keyboard/permission status chips with fix buttons, the last three dictations. |
+| **History** | Reverse-chronological list, search, copy, delete (swipe), `source` chip (keyboard / action button / in-app). |
+| **Settings** | Transcription engine (Local · Groq · OpenAI, with the same cost badges and "Get your API key ↗" + live verify as the desktop); Cleanup engine (Rules · Groq · OpenAI); toggles: auto-stop on silence, copy dictations to clipboard, Android only: auto-listen, return to previous keyboard; About. |
 
-| Command | iOS | Android |
-|---|---|---|
-| `secret_set/get/delete` | Keychain, access group `group.com.murmur.app` (readable by the extension) | `EncryptedSharedPreferences` (same app process as the IME) |
-| `mic_status` / `request_mic` | `AVAudioApplication.requestRecordPermission` | `RECORD_AUDIO` runtime request |
-| `speech_status` / `request_speech` | `SFSpeechRecognizer.requestAuthorization` | n/a (returns granted) |
-| `keyboard_enabled` | checks `AppleKeyboards` for the extension bundle id; Full Access is known because the extension writes a `fullAccess` heartbeat to the App Group each time it appears (`hasFullAccess`), and the app reads it | `InputMethodManager.enabledInputMethodList` |
-| `open_keyboard_settings` | `app-settings:` URL | `ACTION_INPUT_METHOD_SETTINGS` |
-| `platform` | `"ios"` | `"android"` |
-| `run_test_dictation` | presents the native recording screen, resolves with the result | starts the recording view in-app |
+**Onboarding order**
+1. Microphone (system prompt; deep link to Settings if denied).
+2. Speech recognition (iOS only; the local engine needs it).
+3. Engine: **Local (free, on-device)** preselected and needs nothing; Groq/OpenAI reuse the
+   key flow. On iOS this step also calls `AssetInventory.reserve` for the locale.
+4. Enable the keyboard: an illustrated step that deep-links to the platform keyboard settings
+   (`app-settings:` / `ACTION_INPUT_METHOD_SETTINGS`) and polls until Murmur is enabled. iOS
+   also asks for **Allow Full Access** with the honest one-line reason: "so the keyboard can
+   read your dictation from Murmur and your keys."
+5. iOS only, optional: **Action Button** (iPhone 15 Pro and newer) or **Control Center button**
+   (every iPhone on iOS 18+), each with a deep link and a "Test it" button.
+6. Test dictation on the Home screen.
 
-Engine choice and the local/cloud setting continue to live in `settings.json` (store plugin).
-On iOS the store file is written into the App Group container so the extension can read the
-selected engine; on Android the IME shares the app's files directory.
+**iOS app (`apple/Murmur`, SwiftUI, min iOS 17).** State lives in observable view models so
+the logic is unit-testable without UI. Settings are stored in `UserDefaults(suiteName:
+"group.com.murmur.app")` so the keyboard can read the engine choice; keys live in the Keychain
+under access group `$(TeamIdentifierPrefix)com.murmur.app` shared with the extension. History
+is SQLite (GRDB) in the App Group container. Keyboard-enabled detection reads
+`UserDefaults.standard` key `AppleKeyboards` for the extension bundle id; Full Access is known
+because the extension writes a `fullAccess` heartbeat (`hasFullAccess`) to the App Group each
+time it appears.
+
+**Android app (`android/app`, Kotlin + Jetpack Compose, min SDK 28).** Settings in DataStore,
+keys in `EncryptedSharedPreferences`, history in Room. The input method service lives in the
+same module and process, so it reads the same stores directly. `RECORD_AUDIO` is requested
+here (an IME cannot show a runtime permission dialog itself). Keyboard-enabled detection uses
+`InputMethodManager.enabledInputMethodList`.
 
 ## 6. iOS: keyboard extension + recording round trip
 
@@ -199,8 +200,9 @@ Behaviour:
    "Listening in Murmur…" state and poll the App Group every 500 ms for up to 60 s.
 
 ### 6.2 Recording screen (`MurmurRecorder`, SwiftUI, inside the containing app)
-Presented by the AppDelegate the instant the URL arrives, as a full-screen cover **over the
-Tauri webview, before the webview finishes loading**, so cold-start latency is native.
+Presented the instant the `murmur://dictate` URL arrives (`onOpenURL`), as a full-screen cover
+over whatever screen the app was on; the app's launch path does no work before this so the mic
+is live within ~300 ms of foreground.
 - Starts recording immediately (AVAudioEngine, 16 kHz mono float).
 - Shows the same visual language as the Mac HUD: pulsing red dot while recording, translucent
   squiggle while transcribing. A live level meter drives the dot.
@@ -232,11 +234,12 @@ Tauri webview, before the webview finishes loading**, so cold-start latency is n
   inserts it on return. Otherwise the user pastes.
 
 ### 6.4 Project wiring
-- `src-tauri/ios-template/project.yml` adds target `MurmurKeyboard` (type
-  `app-extension`, `NSExtensionPointIdentifier = com.apple.keyboard-service`,
-  `RequestsOpenAccess = YES`, `PrimaryLanguage = en-US`), links `MurmurShared` and
-  `MurmurCore.xcframework`, and gives both targets the App Group and Keychain access group
-  entitlements. Bundle ids: `com.murmur.app` (app), `com.murmur.app.keyboard` (extension).
+- `apple/Murmur.xcodeproj` is hand-maintained. Target `MurmurKeyboard` is an app extension
+  (`NSExtensionPointIdentifier = com.apple.keyboard-service`, `RequestsOpenAccess = YES`,
+  `PrimaryLanguage = en-US`), links `MurmurShared` and `MurmurCore.xcframework`. Both targets
+  carry the App Group and Keychain access group entitlements. Bundle ids: `com.murmur.app`
+  (app), `com.murmur.app.keyboard` (extension). A Run Script phase on the app target runs
+  `scripts/build-core-mobile.sh ios` so a plain `xcodebuild` produces the framework.
 - Info.plist strings: `NSMicrophoneUsageDescription`, `NSSpeechRecognitionUsageDescription`.
   URL scheme `murmur`. Minimum iOS 17.
 - `PrivacyInfo.xcprivacy` declares the required-reason APIs used (UserDefaults, file timestamps).
@@ -270,11 +273,11 @@ Tauri webview, before the webview finishes loading**, so cold-start latency is n
   own process and sandbox.
 
 ### 7.2 Containing app wiring
-- `gen/android` is committed; the IME lives in the app module (not a separate Gradle module) so
-  Tauri's build stays untouched; Kotlin sources are added under
-  `gen/android/app/src/main/java/com/murmur/app/ime/` via a symlink to `android/ime/` so the
-  sources are reviewed in one place.
-- `build-core-mobile.sh` drops the UniFFI Kotlin binding and `libmurmur_core.so` into `jniLibs`.
+- The IME lives in the single `app` module under `com.murmur.app.ime`, registered in the
+  manifest next to the main activity.
+- A Gradle task `buildRustCore` runs `scripts/build-core-mobile.sh android`, which uses
+  `cargo-ndk` to build `libmurmur_core.so` per ABI into `jniLibs` and drops the UniFFI Kotlin
+  binding into the source set. `./gradlew assembleDebug` is the only entry point.
 - Min SDK 28 (needed for `switchToPreviousInputMethod`), target SDK current.
 
 ## 8. Data flow (one dictation, iOS keyboard path)
@@ -327,11 +330,11 @@ Android path: globe → Murmur → (auto) record → STT → cleanup → `commit
   character it shows, shift/caps behave like the system keyboard).
 - **Kotlin (JUnit + Robolectric):** the IME state machine, `commitText` + switch-back ordering
   with a fake `InputConnection`, and silence detection.
-- **React (Vitest):** mobile onboarding steps gate correctly per platform; desktop components are
-  absent on mobile; existing 24 tests keep passing.
+- **Swift view models (XCTest):** onboarding step gating, engine/key state, history search.
+- **React (Vitest):** the desktop UI is untouched; the existing 24 tests keep passing.
 - **CI:** the existing matrix adds `cargo build --target aarch64-apple-ios` and
-  `--target aarch64-linux-android` for `murmur-core`, an `xcodebuild test` on the simulator, and
-  `./gradlew testDebugUnitTest`.
+  `--target aarch64-linux-android` for `murmur-core`, `xcodebuild test` on the simulator for
+  both Swift test targets, and `./gradlew testDebugUnitTest`.
 - **Device gates (only Matt):** mic prompts, Full Access, real keyboard insertion into Messages,
   Safari, and Notes; Action Button; swipe-back timing; Gboard round trip on a physical Android
   device or emulator with Google speech services.
@@ -340,16 +343,15 @@ Android path: globe → Murmur → (auto) record → STT → cleanup → `commit
 
 Each milestone gets its own implementation plan and lands on `main` behind a green CI.
 
-- **MM0 — Core extraction + scaffolds.** `murmur-core` workspace crate, UniFFI bindings,
-  `tauri ios init` / `tauri android init` committed, both containing apps boot on simulator and
-  emulator showing the React settings UI in phone layout. Desktop unchanged.
-- **MM1 — iOS containing app.** Native plugin (secrets, permissions, speech), mobile onboarding,
-  recorder screen with local + cloud engines, history, in-app test dictation.
-- **MM2 — iOS keyboard + Action Button.** Extension target via the custom XcodeGen template, the
-  letter/number/symbol layout, App Group handoff, swipe-back flow, `DictateIntent` + Control
+- **MM0 — Core extraction + shells.** `murmur-core` workspace crate, UniFFI bindings,
+  `build-core-mobile.sh`, an iOS app shell and an Android app shell that boot on simulator and
+  emulator and call one core function end to end. Desktop unchanged, all existing tests green.
+- **MM1 — iOS containing app.** Keychain/App Group/settings model, onboarding, home, settings,
+  history, the recorder screen with local + cloud engines, in-app test dictation.
+- **MM2 — iOS keyboard + Action Button.** Extension target, the letter/number/symbol layout, App Group handoff, swipe-back flow, `DictateIntent` + Control
   Center control. **First TestFlight build.**
-- **MM3 — Android keyboard.** IME, recording, local + cloud, switch-back, onboarding.
-  **First Play internal-testing build.**
+- **MM3 — Android app + keyboard.** Compose onboarding/home/settings/history, the IME with
+  recording, local + cloud, switch-back. **First Play internal-testing build.**
 - **MM4 — Store release.** App Store Connect app record (name availability check: "Murmur" may
   be taken; fallback "Murmur Dictation"), screenshots, privacy labels/policy, review notes with a
   demo Groq key, submission through the ASC API using the existing tooling in
@@ -362,8 +364,11 @@ feed the `prompt` argument that already exists in the core API).
 
 ## 13. Toolchain to install on this Mac before MM0
 
-`brew install xcodegen`; `rustup target add aarch64-apple-ios aarch64-apple-ios-sim
-aarch64-linux-android x86_64-linux-android`; Android SDK + NDK through Android Studio's SDK
-Manager (Android Studio is installed, no SDK yet); `cargo install uniffi-bindgen-cli` pinned to the
-same version as the `uniffi` crate; `ANDROID_HOME`, `NDK_HOME`, and `JAVA_HOME`
-(`/Applications/Android Studio.app/Contents/jbr/Contents/Home`) in the shell profile.
+`rustup target add aarch64-apple-ios aarch64-apple-ios-sim aarch64-linux-android
+x86_64-linux-android`; `cargo install cargo-ndk`; `cargo install uniffi-bindgen-cli` pinned to
+the same version as the `uniffi` crate; Android SDK (API 35) + NDK + an emulator image through
+Android Studio's SDK Manager (Android Studio is installed, no SDK yet); `ANDROID_HOME`,
+`ANDROID_NDK_HOME`, and `JAVA_HOME` (`/Applications/Android Studio.app/Contents/jbr/Contents/Home`)
+in the shell profile. Xcode 26.6 is already installed and the ARKHE team's development
+certificate is in the keychain; the `com.murmur.app` identifiers, App Group, and keyboard
+entitlement are registered in that team's developer portal during MM2.
