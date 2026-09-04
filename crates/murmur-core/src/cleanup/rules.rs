@@ -1,11 +1,12 @@
-use super::CleanupEngine;
-
+/// Offline cleanup: drop standalone filler words, capitalize sentences, ensure
+/// terminal punctuation. Always available, never fails — the safety net behind
+/// every cloud path.
 pub struct RuleCleanup;
 
 const FILLERS: &[&str] = &["um", "uh", "er", "erm", "hmm", "uhh", "umm"];
 
-impl CleanupEngine for RuleCleanup {
-    fn clean(&self, raw: &str) -> String {
+impl RuleCleanup {
+    pub fn clean(&self, raw: &str) -> String {
         // 1. tokenize on whitespace, drop standalone filler words (case-insensitive)
         let kept: Vec<&str> = raw
             .split_whitespace()

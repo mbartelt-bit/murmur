@@ -1,14 +1,37 @@
-pub(super) mod rules;
-mod cloud;
+use murmur_core::{cleanup::RuleCleanup, CloudConfig};
 use tauri::AppHandle;
 use tauri_plugin_store::StoreExt;
 
 pub trait CleanupEngine { fn clean(&self, raw: &str) -> String; }
-pub fn default_cleanup() -> Box<dyn CleanupEngine + Send + Sync> {
-    Box::new(rules::RuleCleanup)
+
+impl CleanupEngine for RuleCleanup {
+    fn clean(&self, raw: &str) -> String {
+        RuleCleanup::clean(self, raw)
+    }
 }
 
-pub use cloud::CloudCleanup;
+pub fn default_cleanup() -> Box<dyn CleanupEngine + Send + Sync> {
+    Box::new(RuleCleanup)
+}
+
+/// Desktop adapter over `murmur_core::clean_text`, which already falls back to
+/// the rules engine on any cloud failure, so words are never lost.
+pub struct CloudCleanup {
+    cfg: CloudConfig,
+}
+
+impl CloudCleanup {
+    pub fn new(cfg: CloudConfig) -> Self {
+        Self { cfg }
+    }
+}
+
+impl CleanupEngine for CloudCleanup {
+    fn clean(&self, raw: &str) -> String {
+        let call = murmur_core::clean_text(raw.to_owned(), Some(self.cfg.clone()));
+        tauri::async_runtime::block_on(call).clean
+    }
+}
 
 /// Resolve the stored "cleanup_engine" setting to a canonical choice string.
 /// Returns "openai", "groq", or "rule" (default for any unrecognised/absent value).
@@ -30,14 +53,14 @@ pub fn make_engine(app: &AppHandle) -> Box<dyn CleanupEngine + Send + Sync> {
 
     let choice = cleanup_choice(stored.as_deref());
 
-    if let Some(provider) = crate::provider::Provider::from_id(choice) {
-        let key = crate::secrets::get(provider.key_account())
+    if let Some(provider) = murmur_core::Provider::from_id(choice) {
+        let api_key = crate::secrets::get(provider.key_account())
             .ok()
             .flatten()
             .unwrap_or_default();
-        Box::new(cloud::CloudCleanup::new(provider.base_url(), provider.chat_model(), key))
+        Box::new(CloudCleanup::new(CloudConfig { provider, api_key }))
     } else {
-        Box::new(rules::RuleCleanup)
+        Box::new(RuleCleanup)
     }
 }
 

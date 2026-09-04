@@ -19,12 +19,21 @@ jobs:
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
       - run: npm ci
       - run: npx vitest run
-      # Build the frontend BEFORE any cargo step: tauri::generate_context!
-      # embeds ../dist at compile time and fails if it doesn't exist.
+      # murmur-core needs no frontend and no Tauri: run it first so a core
+      # regression fails fast.
+      - run: cargo test -p murmur-core
+      # The core must keep cross-compiling for mobile without the desktop-only
+      # `whisper` feature (whisper.cpp is never built for a phone).
+      - name: Build murmur-core for iOS
+        if: runner.os == 'macOS'
+        run: |
+          rustup target add aarch64-apple-ios aarch64-linux-android
+          cargo build -p murmur-core --target aarch64-apple-ios --no-default-features
+      # Build the frontend BEFORE any cargo step for the tauri crate:
+      # tauri::generate_context! embeds ../dist at compile time and fails if it
+      # doesn't exist.
       - run: npm run build
       - run: cargo test --manifest-path src-tauri/Cargo.toml
       - run: cargo build --manifest-path src-tauri/Cargo.toml

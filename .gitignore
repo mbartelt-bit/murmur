@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Cargo workspace build output (the workspace root moved here with murmur-core)
+/target/
+
 # Subagent-driven-development scratch reports/diffs
 .superpowers/
 

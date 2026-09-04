@@ -3,7 +3,6 @@ use crate::{
     cleanup,
     hotkey::{self, PttSink},
     insert,
-    resample,
     stt,
     windows,
 };
@@ -150,7 +149,7 @@ impl PttSink for Pipeline {
             } else {
                 interleaved
             };
-            let audio16k = resample::resample_linear(&mono, sr, 16000);
+            let audio16k = murmur_core::resample::resample_linear(&mono, sr, 16000);
 
             let engine = stt::make_engine(&app);
             let raw = match engine.transcribe(&audio16k, "") {

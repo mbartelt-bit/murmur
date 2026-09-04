@@ -22,18 +22,20 @@ tauri-plugin-store = "2.4.3"
 zeroize = "1"
 cpal = "0.18"
 anyhow = "1.0.103"
-reqwest = { version = "0.12", default-features = false, features = ["stream", "rustls-tls", "http2", "charset", "json", "blocking", "multipart"] }
+reqwest = { version = "0.12", default-features = false, features = ["stream", "rustls-tls", "http2", "json"] }
 futures-util = "0.3"
 arboard = "3"
 enigo = "0.6"
 tauri-plugin-global-shortcut = "2.3.2"
 tauri-plugin-clipboard-manager = "2.3.2"
+# The shared pipeline. `whisper` is desktop-only; mobile builds the same crate
+# with --no-default-features.
+murmur-core = { path = "../crates/murmur-core", features = ["whisper"] }
 
-# keyring and whisper-rs appear in both target tables because their backends
-# are per-OS Cargo features (Keychain vs Credential Manager; Metal vs CPU).
+# keyring appears in both target tables because its backend is a per-OS Cargo
+# feature (Keychain vs Credential Manager). whisper-rs now lives in murmur-core.
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { version = "3", features = ["apple-native"] }
-whisper-rs = { version = "0.16", features = ["metal"] }
 objc2-av-foundation = { version = "0.3.2", features = ["AVCaptureDevice", "AVMediaFormat"] }
 block2 = "0.6.2"
 macos-accessibility-client = "0.0.2"
@@ -43,4 +45,3 @@ core-foundation = "0.10"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 keyring = { version = "3", features = ["windows-native"] }
-whisper-rs = "0.16"

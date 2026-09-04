@@ -2,19 +2,9 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{SampleFormat, StreamConfig};
 use std::sync::{Arc, Mutex};
 
-pub fn rms(samples: &[f32]) -> f32 {
-    if samples.is_empty() { return 0.0; }
-    let sum_sq: f32 = samples.iter().map(|s| s * s).sum();
-    (sum_sq / samples.len() as f32).sqrt()
-}
-
-pub fn peak(samples: &[f32]) -> f32 {
-    samples.iter().fold(0.0_f32, |m, &s| m.max(s.abs()))
-}
-
-pub fn stereo_to_mono(interleaved: &[f32]) -> Vec<f32> {
-    interleaved.chunks_exact(2).map(|f| (f[0] + f[1]) * 0.5).collect()
-}
+// The sample math is shared with iOS/Android; only capture is desktop-specific.
+#[allow(unused_imports)]
+pub use murmur_core::audio_math::{peak, rms, stereo_to_mono};
 
 pub struct Capture {
     stream: cpal::Stream,
@@ -65,23 +55,5 @@ impl Capture {
         let _ = self.stream.pause();
         let out = self.buffer.lock().map(|b| b.clone()).unwrap_or_default();
         out
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn rms_of_silence_is_zero() { assert_eq!(rms(&[0.0; 16]), 0.0); }
-    #[test]
-    fn rms_of_constant_is_magnitude() {
-        let v = vec![0.5_f32; 100];
-        assert!((rms(&v) - 0.5).abs() < 1e-6);
-    }
-    #[test]
-    fn peak_returns_max_abs() { assert!((peak(&[0.1, -0.9, 0.3]) - 0.9).abs() < 1e-6); }
-    #[test]
-    fn stereo_downmix_averages_frames() {
-        assert_eq!(stereo_to_mono(&[1.0, 0.0, 0.0, 1.0]), vec![0.5, 0.5]);
     }
 }

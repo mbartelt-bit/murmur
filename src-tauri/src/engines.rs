@@ -1,4 +1,4 @@
-use std::time::Duration;
+use murmur_core::CloudConfig;
 use tauri::AppHandle;
 use tauri_plugin_store::StoreExt;
 use zeroize::Zeroizing;
@@ -76,7 +76,7 @@ pub fn stt_ready(app: AppHandle) -> bool {
 
     let choice = crate::stt::stt_choice(stored.as_deref());
 
-    if let Some(provider) = crate::provider::Provider::from_id(choice) {
+    if let Some(provider) = murmur_core::Provider::from_id(choice) {
         key_present(provider.key_account())
     } else {
         // Local: model file must exist and be >1 MB
@@ -100,7 +100,7 @@ fn key_present(account: &str) -> bool {
 /// Returns `Ok("Connected")` on HTTP 200, or `Err` with a user-facing message.
 #[tauri::command]
 pub fn verify_provider(provider: String) -> Result<String, String> {
-    let p = crate::provider::Provider::from_id(&provider)
+    let p = murmur_core::Provider::from_id(&provider)
         .ok_or_else(|| "Unknown provider.".to_owned())?;
 
     let key = Zeroizing::new(
@@ -110,21 +110,8 @@ pub fn verify_provider(provider: String) -> Result<String, String> {
             .ok_or_else(|| "No API key saved yet.".to_owned())?,
     );
 
-    let client = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(10))
-        .build()
-        .map_err(|e| format!("Couldn't create HTTP client: {}", e))?;
-
-    let url = format!("{}/models", p.base_url());
-    let resp = client
-        .get(&url)
-        .bearer_auth(key.as_str())
-        .send()
-        .map_err(|_| format!("Couldn't reach {} — check your connection.", provider))?;
-
-    match resp.status().as_u16() {
-        200 => Ok("Connected".to_owned()),
-        401 | 403 => Err("That key was rejected — double-check it and try again.".to_owned()),
-        s => Err(format!("Couldn't verify the key (HTTP {}).", s)),
-    }
+    let cfg = CloudConfig { provider: p, api_key: key.to_string() };
+    tauri::async_runtime::block_on(murmur_core::verify_provider(cfg))
+        .map(|_| "Connected".to_owned())
+        .map_err(|e| e.to_string())
 }

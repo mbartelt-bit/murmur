@@ -1,4 +1,3 @@
-use super::SttEngine;
 use std::path::PathBuf;
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
@@ -12,8 +11,9 @@ impl LocalWhisper {
     }
 }
 
-impl SttEngine for LocalWhisper {
-    fn transcribe(&self, audio: &[f32], prompt: &str) -> anyhow::Result<String> {
+impl LocalWhisper {
+    /// 16 kHz mono f32 in, transcript out. Desktop only (feature `whisper`).
+    pub fn transcribe(&self, audio: &[f32], prompt: &str) -> anyhow::Result<String> {
         if audio.is_empty() {
             return Ok(String::new());
         }
