@@ -40,3 +40,36 @@ xcodebuild -project apple/Murmur.xcodeproj -scheme Murmur \
 | `Murmur.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved` | Pins the one external dependency (GRDB) so CI resolves the same version. Committed. |
 | `Frameworks/MurmurCore.xcframework` | Build output, gitignored. |
 | `MurmurShared/Sources/MurmurCore/Generated/` | Generated UniFFI bindings, gitignored. |
+
+## What the app does (MM1)
+
+| Screen | Where | What |
+|---|---|---|
+| Onboarding | `Murmur/Onboarding/` | Microphone → Speech recognition → Engine (Local · Groq · OpenAI, with the guided key flow) → Try dictation. Gated per step; `OnboardingViewModel.canAdvance`. |
+| Home | `Murmur/Home/` | "Try dictation", status chips (mic / speech / engine) with one-tap fixes, the last three dictations (tap to copy). |
+| History | `Murmur/History/` | Searchable, newest first, swipe to delete, tap to copy, "Show raw" context menu. |
+| Settings | `Murmur/Settings/` | Engine pickers, per-provider key sections (live verify, remove), auto-stop and clipboard toggles, About. |
+| Recorder | `Murmur/Recorder/` | Full-screen cover presented by `murmur://dictate[?session=UUID]` or "Try dictation": records immediately, auto-stops on silence, transcribes (on-device or cloud), cleans, writes history, copies, and hands off to the keyboard via the App Group when a session is present. |
+
+Shared, testable logic lives in `MurmurShared/Sources/MurmurShared/` (`AppGroup`, `Settings`, `Keychain`, `Handoff`, `HistoryStore`, `Audio/`, `Speech/`, `Pipeline/`). Every view model is unit-tested with fakes; nothing in `MurmurTests` touches the mic, the network, or speech services.
+
+### Debug-only screenshot mode
+
+`xcrun simctl launch booted com.murmur.app -murmurScreen home|history|settings|onboarding` opens a given screen and seeds two history rows the first time. Compiled out of Release.
+
+### Run it on your iPhone
+
+1. Plug the phone in, unlock it, and trust the Mac. Open `apple/Murmur.xcodeproj` in Xcode once, select the Murmur target → Signing & Capabilities: team **ARKHE Software, LLC**, automatic signing. Xcode registers `com.murmur.app`, the App Group `group.com.murmur.app`, and the keychain group on the first device build — accept the prompts.
+2. Run (⌘R) with the phone selected, or from the terminal:
+   ```bash
+   xcodebuild -project apple/Murmur.xcodeproj -scheme Murmur -destination 'platform=iOS,name=<your iPhone name>' -allowProvisioningUpdates build
+   ```
+3. The simulator cannot record: `AVAudioEngine`'s input aborts inside AudioToolbox on the simulator, so recording, on-device speech, and the cloud round trip are only real on a device.
+
+### Device checklist (MM1)
+
+1. Fresh install → onboarding: the mic prompt appears and grants; the speech prompt appears and grants; Local shows ready (or downloads the on-device model once).
+2. Home → Try dictation → say one sentence → it auto-stops after a pause → the cleaned text appears and is in History with the "In app" chip; tapping it copies.
+3. Settings → Groq: "Get your API key ↗" opens Safari; pasting the key shows "✓ Connected"; switch Transcription to Groq and dictate; then airplane mode + Groq → falls back to on-device and still returns text.
+4. Safari address bar: `murmur://dictate?session=00000000-0000-4000-8000-000000000001` → the recorder opens straight into listening, records, shows "Swipe back to your app", and the clipboard holds the text.
+5. Settings → turn off "Copy dictations to the clipboard" → dictate → clipboard unchanged, History still has it.
