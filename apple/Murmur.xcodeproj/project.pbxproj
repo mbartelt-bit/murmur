@@ -8,12 +8,14 @@
 
 /* Begin PBXBuildFile section */
 		4F14AEC41A87ED2E2CDCBC3D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = FBF74434C602C47E5BAA6CED /* Assets.xcassets */; };
+		54B54117C0214C3CAD7AAA92 /* DictationPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE88C50F31345F79BD1784EC /* DictationPipelineTests.swift */; };
 		6DA49FB9CCA842FA4B2688C0 /* MurmurApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED35761EBF7EF881FA0E7BB9 /* MurmurApp.swift */; };
 		74ECE6E3168B85AF31BA35A3 /* HandoffTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B80931EAFDBEEA125B85E5A /* HandoffTests.swift */; };
 		90756F6C15EBC4E32615AF21 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02BAA4574F87223BC319490A /* HomeView.swift */; };
 		965395B586FC2E218C2584E9 /* HistoryStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BF6D0335BBF3C2CC18E0465 /* HistoryStoreTests.swift */; };
 		A1D598BE7BE7F424311C5823 /* CoreClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C982F3FC086F222E7E61F71 /* CoreClientTests.swift */; };
 		CCA6160297EC5A1677B8106D /* MurmurShared in Frameworks */ = {isa = PBXBuildFile; productRef = 7F84C9795039EB09B2A8A8E3 /* MurmurShared */; };
+		DBCF0AB1BB3AABA20886CBAA /* SilenceDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ABB944B230B5227EF92C9D7 /* SilenceDetectorTests.swift */; };
 		E361E6861DCD5F4C29328803 /* KeychainTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 745B1FAABE84FAB73AC85298 /* KeychainTests.swift */; };
 		ECD89E9762CD86CA88B0C5FF /* SettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 419F13E44B83582054D8A6D3 /* SettingsTests.swift */; };
 /* End PBXBuildFile section */
@@ -30,6 +32,7 @@
 
 /* Begin PBXFileReference section */
 		02BAA4574F87223BC319490A /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		1ABB944B230B5227EF92C9D7 /* SilenceDetectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SilenceDetectorTests.swift; sourceTree = "<group>"; };
 		1EC05706BDDF617F2CBF12AD /* MurmurTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MurmurTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		30819F7CC91414EA34927C44 /* MurmurShared */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MurmurShared; path = MurmurShared; sourceTree = SOURCE_ROOT; };
 		3B80931EAFDBEEA125B85E5A /* HandoffTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffTests.swift; sourceTree = "<group>"; };
@@ -39,6 +42,7 @@
 		705220A3846AC6270FEBBC24 /* Murmur.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Murmur.entitlements; sourceTree = "<group>"; };
 		745B1FAABE84FAB73AC85298 /* KeychainTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainTests.swift; sourceTree = "<group>"; };
 		BA0E563F85E519D1E62A21CB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		BE88C50F31345F79BD1784EC /* DictationPipelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictationPipelineTests.swift; sourceTree = "<group>"; };
 		C834EC374C4A986C47F46292 /* Murmur.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Murmur.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED35761EBF7EF881FA0E7BB9 /* MurmurApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MurmurApp.swift; sourceTree = "<group>"; };
 		FBF74434C602C47E5BAA6CED /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -99,10 +103,12 @@
 			isa = PBXGroup;
 			children = (
 				4C982F3FC086F222E7E61F71 /* CoreClientTests.swift */,
+				BE88C50F31345F79BD1784EC /* DictationPipelineTests.swift */,
 				3B80931EAFDBEEA125B85E5A /* HandoffTests.swift */,
 				3BF6D0335BBF3C2CC18E0465 /* HistoryStoreTests.swift */,
 				745B1FAABE84FAB73AC85298 /* KeychainTests.swift */,
 				419F13E44B83582054D8A6D3 /* SettingsTests.swift */,
+				1ABB944B230B5227EF92C9D7 /* SilenceDetectorTests.swift */,
 			);
 			path = MurmurTests;
 			sourceTree = "<group>";
@@ -239,10 +245,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1D598BE7BE7F424311C5823 /* CoreClientTests.swift in Sources */,
+				54B54117C0214C3CAD7AAA92 /* DictationPipelineTests.swift in Sources */,
 				74ECE6E3168B85AF31BA35A3 /* HandoffTests.swift in Sources */,
 				965395B586FC2E218C2584E9 /* HistoryStoreTests.swift in Sources */,
 				E361E6861DCD5F4C29328803 /* KeychainTests.swift in Sources */,
 				ECD89E9762CD86CA88B0C5FF /* SettingsTests.swift in Sources */,
+				DBCF0AB1BB3AABA20886CBAA /* SilenceDetectorTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
