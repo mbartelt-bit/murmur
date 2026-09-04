@@ -11,6 +11,7 @@
 		6DA49FB9CCA842FA4B2688C0 /* MurmurApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED35761EBF7EF881FA0E7BB9 /* MurmurApp.swift */; };
 		74ECE6E3168B85AF31BA35A3 /* HandoffTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B80931EAFDBEEA125B85E5A /* HandoffTests.swift */; };
 		90756F6C15EBC4E32615AF21 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02BAA4574F87223BC319490A /* HomeView.swift */; };
+		965395B586FC2E218C2584E9 /* HistoryStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BF6D0335BBF3C2CC18E0465 /* HistoryStoreTests.swift */; };
 		A1D598BE7BE7F424311C5823 /* CoreClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C982F3FC086F222E7E61F71 /* CoreClientTests.swift */; };
 		CCA6160297EC5A1677B8106D /* MurmurShared in Frameworks */ = {isa = PBXBuildFile; productRef = 7F84C9795039EB09B2A8A8E3 /* MurmurShared */; };
 		E361E6861DCD5F4C29328803 /* KeychainTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 745B1FAABE84FAB73AC85298 /* KeychainTests.swift */; };
@@ -32,6 +33,7 @@
 		1EC05706BDDF617F2CBF12AD /* MurmurTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MurmurTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		30819F7CC91414EA34927C44 /* MurmurShared */ = {isa = PBXFileReference; lastKnownFileType = folder; name = MurmurShared; path = MurmurShared; sourceTree = SOURCE_ROOT; };
 		3B80931EAFDBEEA125B85E5A /* HandoffTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffTests.swift; sourceTree = "<group>"; };
+		3BF6D0335BBF3C2CC18E0465 /* HistoryStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryStoreTests.swift; sourceTree = "<group>"; };
 		419F13E44B83582054D8A6D3 /* SettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsTests.swift; sourceTree = "<group>"; };
 		4C982F3FC086F222E7E61F71 /* CoreClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreClientTests.swift; sourceTree = "<group>"; };
 		705220A3846AC6270FEBBC24 /* Murmur.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Murmur.entitlements; sourceTree = "<group>"; };
@@ -98,6 +100,7 @@
 			children = (
 				4C982F3FC086F222E7E61F71 /* CoreClientTests.swift */,
 				3B80931EAFDBEEA125B85E5A /* HandoffTests.swift */,
+				3BF6D0335BBF3C2CC18E0465 /* HistoryStoreTests.swift */,
 				745B1FAABE84FAB73AC85298 /* KeychainTests.swift */,
 				419F13E44B83582054D8A6D3 /* SettingsTests.swift */,
 			);
@@ -237,6 +240,7 @@
 			files = (
 				A1D598BE7BE7F424311C5823 /* CoreClientTests.swift in Sources */,
 				74ECE6E3168B85AF31BA35A3 /* HandoffTests.swift in Sources */,
+				965395B586FC2E218C2584E9 /* HistoryStoreTests.swift in Sources */,
 				E361E6861DCD5F4C29328803 /* KeychainTests.swift in Sources */,
 				ECD89E9762CD86CA88B0C5FF /* SettingsTests.swift in Sources */,
 			);
