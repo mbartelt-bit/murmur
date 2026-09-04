@@ -38,6 +38,13 @@ public enum Handoff {
     /// Ten minutes, matching the spec's "until inserted or for 10 minutes".
     public static let expiry: TimeInterval = 600
 
+    /// The fixed session an Action Button, Shortcut, or Control Center dictation uses.
+    ///
+    /// The keyboard has no way to hand one of those a session id — it was never asked — so both
+    /// sides agree on this constant instead, and the keyboard picks the text up on its next
+    /// appearance exactly the way it picks up its own (MM2 Task 3).
+    public static let intentSession = UUID(uuidString: "00000000-0000-4000-8000-000000000001")!
+
     private static let pendingKey = "handoff.pending"
     private static let resultKey = "handoff.result"
 

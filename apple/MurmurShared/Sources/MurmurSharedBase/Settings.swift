@@ -1,6 +1,5 @@
 import Combine
 import Foundation
-import MurmurCore
 
 /// Which engine turns speech into text.
 public enum SttEngine: String, Codable, CaseIterable {
@@ -24,14 +23,6 @@ public enum ProviderId: String, Codable, CaseIterable {
         switch self {
         case .groq: return "groq_api_key"
         case .openai: return "openai_api_key"
-        }
-    }
-
-    /// The matching `murmur-core` provider for a ``MurmurCore/CloudConfig``.
-    public var core: MurmurCore.Provider {
-        switch self {
-        case .groq: return .groq
-        case .openai: return .openAi
         }
     }
 

@@ -47,6 +47,27 @@ enum Copy {
     static let localReady = "On-device speech is ready."
     static let localUnavailable = "On-device speech isn't available for your language. Pick Groq or OpenAI."
 
+    static let keyboardStepTitle = "Turn on the Murmur keyboard"
+    static let keyboardStepBody = "The keyboard is how Murmur types into every other app. Add it once, in Settings."
+    /// The path Settings actually takes — there is no public deep link past Murmur's own pane.
+    static let keyboardStepPath = "Settings → General → Keyboard → Keyboards → Add New Keyboard → Murmur"
+    static let keyboardFullAccessLine = "Then tap Murmur → Allow Full Access — so the keyboard can read your dictation from Murmur."
+    static let keyboardCheckLine = "Check: open any app, switch to Murmur once, then come back."
+    static let keyboardStepDone = "The Murmur keyboard is on."
+    static let keyboardStepWaiting = "Not added yet — Murmur keeps checking."
+    static let fullAccessOn = "Full Access is on."
+    static let fullAccessOff = "Full Access is off. The mic key will explain it again."
+    static let fullAccessUnknown = "Full Access hasn't been checked yet."
+    static let later = "Later"
+
+    static let triggersStepTitle = "Dictate without the keyboard"
+    static let triggersStepBody = "Two other ways to start: both open Murmur, listen, and put the text on your clipboard."
+    static let controlCenterTitle = "Control Center"
+    static let controlCenterCopy = "Add the Murmur button to Control Center: swipe down, tap +, search Murmur."
+    static let actionButtonTitle = "Action Button"
+    static let actionButtonCopy = "Settings → Action Button → Shortcut → Dictate with Murmur."
+    static let testIt = "Test it"
+
     static let testStepTitle = "Try it"
     static let testStepBody = "Tap the button and say one sentence, then stop talking. Murmur cleans it up and saves it to History."
     static let testStepDone = "That's it. Your dictation is in History."
@@ -99,6 +120,34 @@ enum Copy {
     static let chipAllowed = "Allowed"
     static let chipTapToAllow = "Tap to allow"
     static let chipTapToFix = "Tap to fix"
+
+    // MARK: - Home · finish the last dictation (spec §9, "App killed mid-recording")
+
+    static let recoveryTitle = "Finish last dictation?"
+    /// `duration` comes from ``recoveryDuration(_:)`` — "about 12 s".
+    static func recoveryBody(_ duration: String) -> String {
+        String(format: "Murmur was closed while recording %@ of audio.", duration)
+    }
+
+    /// Deliberately vague: the journal is written every two seconds, so the number is only
+    /// ever approximately what the user said, and "about" is the honest way to say so.
+    static func recoveryDuration(_ seconds: TimeInterval) -> String {
+        "about \(Int(seconds.rounded())) s"
+    }
+
+    /// The same words as the onboarding and keyboard buttons, kept separate so either can be
+    /// reworded without dragging the other with it.
+    static let recoveryFinish = "Finish"
+    static let recoveryDiscard = "Discard"
+    static let recoveryFailed = "Couldn't finish it — the audio was too short or the engine failed."
+
+    static let chipKeyboard = "Keyboard"
+    static let chipFullAccess = "Full Access"
+    static let chipActionButton = "Action Button"
+    static let chipOn = "On"
+    static let chipOff = "Off"
+    static let chipUnknown = "Unknown"
+    static let chipSetUp = "Set up"
 
     /// The engine chip's second line: which engine, and whether it can actually run.
     static func engineSummary(stt: SttEngine, keyPresent: Bool) -> String {

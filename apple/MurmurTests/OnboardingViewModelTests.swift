@@ -56,15 +56,38 @@ final class OnboardingViewModelTests: XCTestCase {
     private func makeViewModel(
         permissions: FakePermissions,
         localAvailable: Bool = true,
-        hasTestTranscript: @escaping () -> Bool = { false }
+        hasTestTranscript: @escaping () -> Bool = { false },
+        keyboardEnabled: @escaping () -> Bool = { false },
+        fullAccess: @escaping () -> Bool? = { nil },
+        hasActionButton: Bool = false
     ) -> OnboardingViewModel {
         OnboardingViewModel(
             settings: settings,
             permissions: permissions,
             speechAvailability: { localAvailable },
             prepareLocalAssets: {},
-            hasTestTranscript: hasTestTranscript
+            hasTestTranscript: hasTestTranscript,
+            keyboardEnabledProvider: keyboardEnabled,
+            fullAccessProvider: fullAccess,
+            hasActionButton: hasActionButton
         )
+    }
+
+    // MARK: - Order
+
+    func testStepOrderIsTheSpecs() {
+        XCTAssertEqual(
+            OnboardingViewModel.Step.allCases,
+            [.microphone, .speech, .engine, .keyboard, .triggers, .test]
+        )
+
+        let viewModel = makeViewModel(permissions: FakePermissions())
+        viewModel.step = .engine
+        XCTAssertEqual(viewModel.nextStep, .keyboard)
+        viewModel.step = .keyboard
+        XCTAssertEqual(viewModel.nextStep, .triggers)
+        viewModel.step = .triggers
+        XCTAssertEqual(viewModel.nextStep, .test)
     }
 
     // MARK: - Microphone
@@ -177,6 +200,83 @@ final class OnboardingViewModelTests: XCTestCase {
 
         XCTAssertEqual(viewModel.stt, .groq)
         XCTAssertEqual(SettingsStore(defaults: defaults).settings.stt, .groq)
+    }
+
+    // MARK: - Keyboard and triggers
+
+    func testKeyboardStepBlocksUntilTheKeyboardIsEnabled() async {
+        var enabled = false
+        let viewModel = makeViewModel(permissions: FakePermissions(), keyboardEnabled: { enabled })
+        viewModel.step = .keyboard
+
+        await viewModel.refresh()
+        XCTAssertFalse(viewModel.keyboardEnabled)
+        XCTAssertFalse(viewModel.canAdvance)
+
+        // The user left for Settings and added it; the poll picks it up with no further input.
+        enabled = true
+        viewModel.refreshKeyboardStatus()
+        XCTAssertTrue(viewModel.keyboardEnabled)
+        XCTAssertTrue(viewModel.canAdvance)
+    }
+
+    func testFullAccessDoesNotGateTheKeyboardStep() {
+        let viewModel = makeViewModel(
+            permissions: FakePermissions(),
+            keyboardEnabled: { true },
+            fullAccess: { false }
+        )
+        viewModel.step = .keyboard
+
+        viewModel.refreshKeyboardStatus()
+
+        // Every key types without Full Access (guideline 4.4.1); only the mic key needs it, and
+        // it explains itself in place.
+        XCTAssertEqual(viewModel.fullAccess, false)
+        XCTAssertTrue(viewModel.canAdvance)
+
+        XCTAssertFalse(viewModel.fullAccessDeferred)
+        viewModel.deferFullAccess()
+        XCTAssertTrue(viewModel.fullAccessDeferred)
+    }
+
+    func testFullAccessIsUnknownUntilTheKeyboardHasAppeared() {
+        let viewModel = makeViewModel(permissions: FakePermissions(), keyboardEnabled: { true })
+
+        viewModel.refreshKeyboardStatus()
+
+        XCTAssertNil(viewModel.fullAccess)
+    }
+
+    func testTriggersStepAlwaysAdvances() {
+        let viewModel = makeViewModel(permissions: FakePermissions(), keyboardEnabled: { false })
+        viewModel.step = .triggers
+
+        XCTAssertTrue(viewModel.canAdvance)
+
+        viewModel.advance()
+        XCTAssertEqual(viewModel.step, .test)
+    }
+
+    func testActionButtonOnlyChangesWhatTheTriggersStepShows() {
+        for present in [false, true] {
+            let viewModel = makeViewModel(permissions: FakePermissions(), hasActionButton: present)
+            viewModel.step = .triggers
+
+            XCTAssertEqual(viewModel.hasActionButton, present)
+            XCTAssertTrue(viewModel.canAdvance)
+            XCTAssertEqual(viewModel.nextStep, .test)
+        }
+    }
+
+    func testTestItRunsTheInjectedTrigger() {
+        var fired = 0
+        let viewModel = makeViewModel(permissions: FakePermissions())
+        viewModel.onTestTrigger = { fired += 1 }
+
+        viewModel.testTrigger()
+
+        XCTAssertEqual(fired, 1)
     }
 
     // MARK: - Test step and finish

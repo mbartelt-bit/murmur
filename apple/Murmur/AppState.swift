@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import MurmurIntents
 import MurmurShared
 
 /// One dictation the app has been asked to run.
@@ -77,6 +78,11 @@ final class AppState: ObservableObject {
     /// machine-written and a malformed one is a bug on the other side, not something to
     /// interrupt the user about.
     func handle(_ url: URL) {
+        // A cold launch straight into a URL can beat the scene going active, and the launch
+        // flag has to win either way: consume it first so an Action Button dictation is not
+        // left sitting in the App Group behind a `murmur://` open.
+        consumeLaunchFlag()
+
         guard url.scheme?.lowercased() == "murmur" else { return }
 
         // `murmur://dictate` puts it in the host; `murmur:dictate` puts it in the path.
@@ -102,6 +108,25 @@ final class AppState: ObservableObject {
     /// The in-app "Try dictation" path: same recorder, no handoff.
     func startInAppDictation() {
         activeDictation = DictationRequest(source: .inApp)
+    }
+
+    /// The Action Button / Shortcut / Control Center path (design spec §6.3).
+    ///
+    /// ``DictateIntent`` cannot open the recorder itself — it runs in its own short-lived
+    /// process and only `openAppWhenRun` brings Murmur forward — so it leaves a flag in the
+    /// App Group and the app picks it up here, on every activation and ahead of every URL.
+    ///
+    /// The request carries ``Handoff/intentSession`` rather than `nil`: nobody handed the
+    /// intent a session id, so both sides agree on that one constant, and a Murmur keyboard
+    /// active in the host app inserts the text on its next appearance exactly the way it does
+    /// for its own round trips.
+    ///
+    /// Removing the flag before presenting is what makes this safe to call as often as it is:
+    /// a second activation with nothing pending does nothing at all.
+    func consumeLaunchFlag(defaults: UserDefaults = AppGroup.defaults) {
+        guard defaults.object(forKey: DictateIntent.launchFlagKey) != nil else { return }
+        defaults.removeObject(forKey: DictateIntent.launchFlagKey)
+        activeDictation = DictationRequest(session: Handoff.intentSession, source: .actionButton)
     }
 
     // MARK: - History

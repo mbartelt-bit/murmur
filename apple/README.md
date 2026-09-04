@@ -73,3 +73,44 @@ Shared, testable logic lives in `MurmurShared/Sources/MurmurShared/` (`AppGroup`
 3. Settings → Groq: "Get your API key ↗" opens Safari; pasting the key shows "✓ Connected"; switch Transcription to Groq and dictate; then airplane mode + Groq → falls back to on-device and still returns text.
 4. Safari address bar: `murmur://dictate?session=00000000-0000-4000-8000-000000000001` → the recorder opens straight into listening, records, shows "Swipe back to your app", and the clipboard holds the text.
 5. Settings → turn off "Copy dictations to the clipboard" → dictate → clipboard unchanged, History still has it.
+
+## The keyboard, the intent, and the Control Center button (MM2)
+
+| Piece | Where | What |
+|---|---|---|
+| Keyboard extension | `MurmurKeyboard/` (thin: view controller + adapters) on top of `MurmurShared/Sources/MurmurKeyboardCore` (layout model, shift state, handoff controller) and `MurmurKeyboardUI` (SwiftUI keys, status strip) | A real three-page keyboard. The mic key writes a pending session to the App Group and opens `murmur://dictate?session=…`; when the keyboard next appears it claims the matching result and inserts it once. Works with Full Access off (everything types; the mic explains). |
+| Dictate intent | `MurmurShared/Sources/MurmurIntents` + `Murmur/MurmurShortcuts.swift` | "Dictate with Murmur" for the Action Button, Back Tap, Siri, and Shortcuts. It only leaves a flag in the App Group; the app reads it on activation and opens the recorder with the fixed intent session, so an active Murmur keyboard inserts the text on return. |
+| Control Center button | `MurmurControls/` (widget extension, iOS 18+) | One press from Control Center or the Lock Screen runs the same intent. |
+| Onboarding steps | `Murmur/Onboarding` | Step 4 gets the keyboard enabled (polls `AppleKeyboards`); step 5 explains the two triggers. |
+| Crash safety | `MurmurShared/Sources/MurmurShared/Audio/RecordingJournal.swift` | Recording samples are journaled every 2 s; a stale journal after a crash surfaces "Finish last dictation?" on Home. |
+
+**Link-graph rule** (enforced by `MurmurShared/Package.swift` and checked in review): the two extensions link `MurmurSharedBase`, `MurmurKeyboardCore`, `MurmurKeyboardUI`, `MurmurIntents` only — never `MurmurShared` or `MurmurCore`. Extensions therefore contain no audio, no speech, no GRDB, and none of the Rust core (`nm` on either `.appex` shows zero `uniffi`/`murmur_core` symbols).
+
+**App Review note (guideline 4.4.1).** The keyboard types characters, offers the next-keyboard globe, and works without Full Access. Its mic key opens Murmur's own containing app through the responder chain — the same pattern shipping dictation keyboards use — and that is the one documented review risk; the intent and Control Center paths need no keyboard launch at all. Review notes for submission should say exactly this.
+
+## TestFlight
+
+One-time, on Matt's side:
+
+1. App Store Connect → My Apps → **+** → New App: iOS, name **Murmur** (fallback **Murmur Dictation** if taken), bundle id `com.murmur.app`, SKU `murmur-ios`, English (US).
+2. iPhone plugged in and unlocked: open `apple/Murmur.xcodeproj`, select the Murmur target → Signing & Capabilities → team **ARKHE Software, LLC**, automatic signing, then run once on the phone. Xcode registers the three identifiers (`com.murmur.app`, `.keyboard`, `.controls`), the App Group, and the keychain group. Accept every "register" prompt.
+3. Make sure the App Store Connect API key is where the script expects it (`~/.appstoreconnect/private_keys/AuthKey_<KEY_ID>.p8`) and export `ASC_KEY_ID` / `ASC_ISSUER_ID`, or leave them for the script to read from `~/arkhe-native-release-tools/asc.mjs`.
+
+Then:
+
+```bash
+scripts/ios-testflight.sh              # archive + upload (bumps CFBundleVersion to the UTC minute for all three bundles)
+scripts/ios-testflight.sh --no-upload  # just the .ipa in target/ios/export/
+```
+
+Processing takes a few minutes; the build then appears under TestFlight → add yourself as an internal tester.
+
+### Device checklist (MM2)
+
+1. Settings → General → Keyboard → Keyboards → Add New Keyboard → **Murmur** appears; enable it; tap Murmur → Allow Full Access. Back in the app, Home's Keyboard and Full Access chips both turn green after the keyboard has appeared once.
+2. In Messages, switch to Murmur with the globe: type with the letters, numbers, and symbols pages; shift and caps lock (double-tap) behave like the system keyboard; delete repeats on hold; the return key sends a newline.
+3. Tap the mic → Murmur opens and is listening within a second → speak → it auto-stops → "Swipe back to your app" → swipe back → the text appears in the Messages field exactly once. Repeat in Notes and in a Safari search field.
+4. Turn Full Access off: typing still works; the mic key shows the explainer; **Settings** opens Settings.
+5. Control Center: add the Murmur button (swipe down, +, search Murmur); tap it from the Lock Screen → the recorder opens → speak → the text is on the clipboard. With the Murmur keyboard active in Notes, it is also inserted on return.
+6. iPhone 15 Pro or newer: Settings → Action Button → Shortcut → **Dictate with Murmur**; press and hold → same as 5.
+7. Force-quit Murmur while it is recording → relaunch → Home shows "Finish last dictation?" → Finish → the text lands in History.

@@ -33,3 +33,7 @@ Rust targets `aarch64-apple-ios`, `aarch64-apple-ios-sim`, `aarch64-linux-androi
 (Android). The script prints the `JAVA_HOME`, `ANDROID_HOME` and
 `ANDROID_NDK_HOME` it resolved and fails with a specific message when a tool is
 missing. Export any of the three to override the defaults.
+
+## `ios-testflight.sh`
+
+Archives the iOS app (Release, automatic signing under team X9PU63GUAN), bumps `CFBundleVersion` for the app and both extensions to the current UTC minute, and uploads to App Store Connect with `xcodebuild -exportArchive` (`destination: upload`) using the ASC API key. `--no-upload` writes the `.ipa` to `target/ios/export/` instead. Prerequisites and the device checklist: `apple/README.md` → TestFlight.

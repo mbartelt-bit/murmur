@@ -53,6 +53,11 @@ final class RecorderViewModel: ObservableObject {
     private let copy: (String) -> Void
     private let defaults: UserDefaults
     private let sleeper: (TimeInterval) async -> Void
+    private let journalFactory: () -> RecordingJournal
+
+    /// The crash journal for the recording currently on screen. One per `start()`, deleted the
+    /// moment the dictation reaches history or fails — see ``deliver(_:)`` and ``fail(_:needsSettings:)``.
+    private var journal: RecordingJournal?
 
     private var startedAt = Date()
     private var silence = SilenceDetector()
@@ -79,7 +84,8 @@ final class RecorderViewModel: ObservableObject {
         requestMic: @escaping () async -> Bool = Permissions.requestMic,
         copy: @escaping (String) -> Void = { UIPasteboard.general.string = $0 },
         defaults: UserDefaults = AppGroup.defaults,
-        sleeper: @escaping (TimeInterval) async -> Void = RecorderViewModel.liveSleep
+        sleeper: @escaping (TimeInterval) async -> Void = RecorderViewModel.liveSleep,
+        journalFactory: @escaping () -> RecordingJournal = { RecordingJournal() }
     ) {
         self.request = request
         self.pipeline = pipeline
@@ -92,10 +98,17 @@ final class RecorderViewModel: ObservableObject {
         self.copy = copy
         self.defaults = defaults
         self.sleeper = sleeper
+        self.journalFactory = journalFactory
     }
 
-    /// `true` when this dictation was requested by the keyboard, which is waiting for the text.
-    var showsSwipeBackHint: Bool { request.session != nil }
+    /// `true` only when the keyboard sent the user here, because only then is there a host app
+    /// to swipe back to.
+    ///
+    /// A session id alone is not enough: an Action Button, Shortcut or Control Center dictation
+    /// also carries one (``Handoff/intentSession``, so a Murmur keyboard can still pick the text
+    /// up on its next appearance) but the user came from the Home Screen, the Lock Screen or
+    /// Siri, and telling them to swipe back would point at nothing.
+    var showsSwipeBackHint: Bool { request.session != nil && request.source == .keyboard }
 
     /// How long the finished text stays on screen before the sheet closes itself.
     var autoDismissAfter: TimeInterval { 8 }
@@ -119,6 +132,10 @@ final class RecorderViewModel: ObservableObject {
         lastPublish = -.infinity
         failedNeedsSettings = false
         phase = .starting
+        // A retry after a failure starts a new recording, so whatever the last attempt
+        // journalled is dead weight — and must not become a "finish last dictation" offer.
+        journal?.discard()
+        journal = nil
 
         // 1. Microphone. Onboarding normally asks first, so `notDetermined` here means the
         //    user arrived from the keyboard or a shortcut before finishing onboarding.
@@ -154,13 +171,21 @@ final class RecorderViewModel: ObservableObject {
             self?.stop()
         }
 
-        // 4. One capture, two consumers: the pipeline eats `forwarded` while every chunk also
-        //    updates the level meter and feeds the silence detector on the way past. Teeing
-        //    here rather than in `AudioCapture` keeps the capture class ignorant of the UI.
+        // 4. The crash journal. Everything the microphone hands over is written to the App
+        //    Group as it passes, so a kill mid-dictation leaves the words on disk instead of
+        //    nowhere (spec §9). It is deleted again on every ending this method has.
+        let journal = journalFactory()
+        self.journal = journal
+
+        // 5. One capture, three consumers: the pipeline eats `forwarded` while every chunk
+        //    also reaches the journal, the level meter and the silence detector on the way
+        //    past. Teeing here rather than in `AudioCapture` keeps the capture class ignorant
+        //    of the UI.
         let forwarded = AsyncStream<AudioChunk>(bufferingPolicy: .unbounded) { continuation in
             Task { [weak self] in
                 for await chunk in source {
                     continuation.yield(chunk)
+                    journal.append(chunk.samples16kMono)
                     await self?.observe(chunk)
                 }
                 continuation.finish()
@@ -170,7 +195,7 @@ final class RecorderViewModel: ObservableObject {
             }
         }
 
-        // 5. Transcribe, clean, write history — all inside the pipeline, which returns only
+        // 6. Transcribe, clean, write history — all inside the pipeline, which returns only
         //    once the row exists.
         do {
             let outcome = try await pipeline.run(audio: forwarded, source: request.source) { [weak self] text in
@@ -198,6 +223,10 @@ final class RecorderViewModel: ObservableObject {
         // Closing the microphone finishes the chunk stream, which is what tells the engine
         // inside the pipeline that there is no more audio coming.
         audio.stop()
+        // The last sub-two-second tail, written now: transcription is the other moment iOS is
+        // entitled to kill the app, and by then the audio is complete but the text does not
+        // exist yet. The journal is only deleted once the row is safely in history.
+        try? journal?.flush()
         phase = .transcribing(partial: lastPartial)
     }
 
@@ -235,6 +264,11 @@ final class RecorderViewModel: ObservableObject {
     /// History was already written by the pipeline. This is everything after it: clipboard,
     /// handoff, screen.
     private func deliver(_ outcome: PipelineOutcome) {
+        // The row exists, so the audio has done its job. Deleting it here is what makes a
+        // leftover journal file mean "killed mid-dictation" and nothing else.
+        journal?.discard()
+        journal = nil
+
         let clean = outcome.transcript.cleanText
 
         var copied = false
@@ -271,6 +305,10 @@ final class RecorderViewModel: ObservableObject {
     private func fail(_ message: String, needsSettings: Bool) {
         isRecording = false
         audio.stop()
+        // A failure the user can see and retry is not a crash: leaving the file behind would
+        // offer them the same audio again from Home, on top of the error they are reading.
+        journal?.discard()
+        journal = nil
         failedNeedsSettings = needsSettings
         phase = .failed(message: message)
     }

@@ -29,17 +29,35 @@ private struct Shell: View {
         self.settings = settings
         _tab = State(initialValue: ScreenshotMode.tab ?? .home)
         ScreenshotMode.seedHistoryIfRequested(app)
+        ScreenshotMode.seedRecoveryIfRequested()
     }
 
     var body: some View {
-        Group {
-            if showsOnboarding {
-                OnboardingView(app: app)
-            } else {
-                tabs
-            }
+        content.tint(Color.murmurIndigo)
+    }
+
+    /// Debug builds get one extra destination: the keyboard preview, which a simulator can
+    /// photograph and an installed keyboard cannot.
+    @ViewBuilder
+    private var content: some View {
+        #if DEBUG
+        if ScreenshotMode.showsKeyboardPreview {
+            KeyboardPreviewScreen()
+        } else {
+            main
         }
-        .tint(Color.murmurIndigo)
+        #else
+        main
+        #endif
+    }
+
+    @ViewBuilder
+    private var main: some View {
+        if showsOnboarding {
+            OnboardingView(app: app)
+        } else {
+            tabs
+        }
     }
 
     /// Onboarding runs until it is finished — or whenever a debug launch asks for it by name.
@@ -68,12 +86,13 @@ private struct Shell: View {
 
 // MARK: - Deterministic screenshots (debug builds only)
 
-/// `-murmurScreen home|history|settings|onboarding`, passed to `simctl launch`.
+/// `-murmurScreen home|homeRecovery|history|settings|onboarding|onboardingKeyboard|onboardingTriggers|keyboardPreview`,
+/// passed to `simctl launch`.
 ///
 /// It exists so a screenshot pass can land on a known screen without driving the UI, and so
 /// History and Home are not photographed empty. Every branch is inside `#if DEBUG`: a release
 /// build reports no screen, seeds nothing, and cannot be talked into either.
-private enum ScreenshotMode {
+enum ScreenshotMode {
     static var requested: String? {
         #if DEBUG
         // Launch arguments of the form `-key value` land in the standard defaults, so there
@@ -84,11 +103,25 @@ private enum ScreenshotMode {
         #endif
     }
 
-    static var forcesOnboarding: Bool { requested == "onboarding" }
+    static var forcesOnboarding: Bool { requested?.hasPrefix("onboarding") == true }
+
+    /// Which step onboarding should open on — `nil` for its normal start. The keyboard and
+    /// trigger steps are unreachable in a screenshot pass any other way: the first would need
+    /// a real microphone grant to walk to, and the second sits behind it.
+    static var onboardingStep: OnboardingViewModel.Step? {
+        switch requested {
+        case "onboardingKeyboard": return .keyboard
+        case "onboardingTriggers": return .triggers
+        default: return nil
+        }
+    }
+
+    /// `-murmurScreen keyboardPreview` — see ``KeyboardPreviewScreen``.
+    static var showsKeyboardPreview: Bool { requested == "keyboardPreview" }
 
     static var tab: MurmurTab? {
         switch requested {
-        case "home": return .home
+        case "home", "homeRecovery": return .home
         case "history": return .history
         case "settings": return .settings
         default: return nil
@@ -131,6 +164,31 @@ private enum ScreenshotMode {
                 )
             )
         }
+        #endif
+    }
+
+    private static var seededRecovery = false
+
+    /// `-murmurScreen homeRecovery` — three seconds of journalled audio, stamped a minute ago
+    /// so it reads as abandoned, dropped in before Home's first `reload()`.
+    ///
+    /// The only way to photograph the "Finish last dictation?" banner without actually killing
+    /// the app mid-recording, which a simulator screenshot pass cannot do. Debug builds only.
+    static func seedRecoveryIfRequested() {
+        #if DEBUG
+        guard let requested, !seededRecovery else { return }
+        seededRecovery = true
+        // Every other screenshot pass starts from a clean journal, so the file this one drops
+        // cannot photobomb the plain Home screen on the next run.
+        if let leftover = RecordingJournal.pending() { RecordingJournal.discard(leftover) }
+        guard requested == "homeRecovery" else { return }
+
+        let stale = Date().addingTimeInterval(-60)
+        let journal = RecordingJournal(clock: { stale })
+        // Silence: the banner reports the file's length, and no engine ever runs in a
+        // screenshot pass. Nothing but samples is written here — see RecordingJournal.
+        journal.append([Float](repeating: 0, count: RecordingJournal.sampleRate * 3))
+        try? journal.flush()
         #endif
     }
 }

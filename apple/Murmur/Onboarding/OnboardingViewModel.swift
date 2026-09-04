@@ -22,15 +22,17 @@ struct LivePermissions: PermissionsProviding {
 
 /// First run, one step per screen.
 ///
-/// The order is the spec's (§5): microphone, speech recognition, engine, test dictation. Each
+/// The order is the spec's (§5): microphone, speech recognition, engine, the keyboard, the
+/// other ways to trigger a dictation, and one test dictation. Each
 /// step has exactly one thing to do and ``canAdvance`` says whether it has been done; the view
 /// owns no rules of its own, which is what makes the whole flow testable with fakes.
 ///
-/// MM2 appends the keyboard and Action Button steps to ``Step``; nothing else here changes.
+/// MM2 adds the two steps that make Murmur reachable from outside the app: the keyboard,
+/// which is a gate (the keyboard *is* the product), and the triggers, which is not.
 @MainActor
 final class OnboardingViewModel: ObservableObject {
     enum Step: Equatable, CaseIterable {
-        case microphone, speech, engine, test
+        case microphone, speech, engine, keyboard, triggers, test
     }
 
     @Published var step: Step = .microphone
@@ -49,12 +51,30 @@ final class OnboardingViewModel: ObservableObject {
     @Published var cloudVerified = false
     /// A dictation has been completed from inside the app; refreshed by ``refresh()``.
     @Published var didTest = false
+    /// The Murmur keyboard is in the user's keyboard list. Polled once a second while the
+    /// keyboard step is on screen: iOS posts no notification when it changes.
+    @Published var keyboardEnabled = false
+    /// The keyboard's Full Access heartbeat: `nil` until the keyboard has appeared once, which
+    /// is why the step tells the user how to make it appear.
+    @Published var fullAccess: Bool?
+    /// Set by the "Later" link: the Full Access nag is dismissed for this run. It never gated
+    /// anything — the keyboard explains it again at the mic key.
+    @Published var fullAccessDeferred = false
+
+    /// This iPhone has an Action Button, so the triggers step has something to say about it.
+    let hasActionButton: Bool
+
+    /// The triggers step's "Test it". The view owns it because only the view can reach
+    /// ``AppState``.
+    var onTestTrigger: (() -> Void)?
 
     private let settings: SettingsStore
     private let permissions: PermissionsProviding
     private let speechAvailability: () async -> Bool
     private let prepareLocalAssets: () async throws -> Void
     private let hasTestTranscript: () -> Bool
+    private let keyboardEnabledProvider: () -> Bool
+    private let fullAccessProvider: () -> Bool?
 
     /// `prepareLocalAssets` and `hasTestTranscript` are injected after the three parameters
     /// the plan names so the documented call site still reads the same; they exist so a unit
@@ -64,13 +84,19 @@ final class OnboardingViewModel: ObservableObject {
         permissions: PermissionsProviding = LivePermissions(),
         speechAvailability: @escaping () async -> Bool = SpeechEngines.isLocalAvailable,
         prepareLocalAssets: @escaping () async throws -> Void = SpeechEngines.prepareLocalAssets,
-        hasTestTranscript: @escaping () -> Bool = { false }
+        hasTestTranscript: @escaping () -> Bool = { false },
+        keyboardEnabledProvider: @escaping () -> Bool = { KeyboardStatus.isEnabled() },
+        fullAccessProvider: @escaping () -> Bool? = { KeyboardStatus.hasFullAccess() },
+        hasActionButton: Bool = KeyboardStatus.hasActionButton
     ) {
         self.settings = settings
         self.permissions = permissions
         self.speechAvailability = speechAvailability
         self.prepareLocalAssets = prepareLocalAssets
         self.hasTestTranscript = hasTestTranscript
+        self.keyboardEnabledProvider = keyboardEnabledProvider
+        self.fullAccessProvider = fullAccessProvider
+        self.hasActionButton = hasActionButton
         stt = settings.settings.stt
     }
 
@@ -91,6 +117,14 @@ final class OnboardingViewModel: ObservableObject {
             return speech == .granted || stt != .local
         case .engine:
             return stt == .local ? localReady : cloudVerified
+        case .keyboard:
+            // The one hard gate MM2 adds. Full Access is not part of it: the keyboard types
+            // without it, and the mic key explains it in place when it is missing.
+            return keyboardEnabled
+        case .triggers:
+            // Nothing to require — the Control Center button and the Action Button are extra
+            // ways in, not the product.
+            return true
         case .test:
             return didTest
         }
@@ -104,6 +138,10 @@ final class OnboardingViewModel: ObservableObject {
         case .speech:
             return .engine
         case .engine:
+            return .keyboard
+        case .keyboard:
+            return .triggers
+        case .triggers:
             return .test
         case .test:
             return nil
@@ -113,6 +151,41 @@ final class OnboardingViewModel: ObservableObject {
     func advance() {
         guard let next = nextStep else { return }
         step = next
+    }
+
+    // MARK: - The keyboard
+
+    /// Re-reads both keyboard answers. Cheap: two `UserDefaults` lookups.
+    func refreshKeyboardStatus() {
+        keyboardEnabled = keyboardEnabledProvider()
+        fullAccess = fullAccessProvider()
+    }
+
+    /// Keeps asking while the keyboard step is on screen.
+    ///
+    /// There is no notification for "the user added a keyboard in Settings", and the user is
+    /// expected to leave for Settings and come back mid-step, so the only way for the check to
+    /// turn green on its own is to look again every second. The view runs this in a `.task`
+    /// bound to the step, which cancels it on the way out.
+    func pollKeyboardStatus(interval: TimeInterval = 1) async {
+        while !Task.isCancelled {
+            refreshKeyboardStatus()
+            do {
+                try await Task.sleep(nanoseconds: UInt64(max(0, interval) * 1_000_000_000))
+            } catch {
+                return
+            }
+        }
+    }
+
+    /// "Later" on the Full Access row: stop showing it for this run.
+    func deferFullAccess() {
+        fullAccessDeferred = true
+    }
+
+    /// The triggers step's "Test it".
+    func testTrigger() {
+        onTestTrigger?()
     }
 
     // MARK: - Actions
@@ -161,6 +234,7 @@ final class OnboardingViewModel: ObservableObject {
         mic = permissions.micStatus()
         speech = permissions.speechStatus()
         didTest = hasTestTranscript()
+        refreshKeyboardStatus()
         if stt == .local {
             localReady = await speechAvailability()
         }
