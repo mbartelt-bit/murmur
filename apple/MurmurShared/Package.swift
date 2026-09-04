@@ -9,12 +9,20 @@ import PackageDescription
 //                    before the first Xcode build or package resolution fails here.
 //   MurmurCore     — the generated Swift bindings (Sources/MurmurCore/Generated, also
 //                    written by that script and gitignored).
-//   MurmurShared   — hand-written Swift the app targets use (CoreClient).
+//   MurmurShared   — hand-written Swift the app targets use (CoreClient, AppGroup,
+//                    Settings, Keychain, Handoff, and the GRDB history store).
+//
+// GRDB backs the transcripts history in the App Group container. Its own Package.swift
+// declares swift-tools-version 6.1, which Xcode 26.6 satisfies; ours stays at 5.9 so our
+// targets keep building in the Swift 5 language mode.
 let package = Package(
     name: "MurmurShared",
     platforms: [.iOS(.v17)],
     products: [
         .library(name: "MurmurShared", targets: ["MurmurShared"])
+    ],
+    dependencies: [
+        .package(url: "https://github.com/groue/GRDB.swift", from: "7.11.1")
     ],
     targets: [
         .binaryTarget(
@@ -28,7 +36,10 @@ let package = Package(
         ),
         .target(
             name: "MurmurShared",
-            dependencies: ["MurmurCore"],
+            dependencies: [
+                "MurmurCore",
+                .product(name: "GRDB", package: "GRDB.swift")
+            ],
             path: "Sources/MurmurShared"
         )
     ]

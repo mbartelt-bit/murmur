@@ -33,11 +33,27 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: NO
         TARGETED_DEVICE_FAMILY: "1,2"
+    entitlements:
+      # Regenerated into Murmur/Murmur.entitlements by xcodegen; both are committed.
+      # The App Group is where settings, the dictation handoff, and (from MM1 Task 2) the
+      # SQLite history live so the MM2 keyboard extension can read them. The keychain group
+      # shares the API keys with that extension; the simulator has no provisioning profile,
+      # so $(AppIdentifierPrefix) stays unexpanded there and access groups are ignored.
+      path: Murmur/Murmur.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.murmur.app
+        keychain-access-groups:
+          - "$(AppIdentifierPrefix)com.murmur.app"
     info:
       path: Murmur/Info.plist
       properties:
         CFBundleDisplayName: Murmur
         CFBundleShortVersionString: "0.1.0"
+        # Read back by Keychain.defaultAccessGroup — the only way to learn the team prefix at
+        # runtime on iOS (SecTaskCopyValueForEntitlement is macOS-only). Unexpanded on the
+        # simulator, which the accessor detects and treats as "no access group".
+        AppIdentifierPrefix: "$(AppIdentifierPrefix)"
         CFBundleVersion: "1"
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
