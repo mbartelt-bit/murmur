@@ -10,7 +10,7 @@ struct MurmurApp: App {
 
     var body: some Scene {
         WindowGroup {
-            HomeView()
+            RootView()
                 .environmentObject(app)
                 .onOpenURL { app.handle($0) }
                 .fullScreenCover(item: $app.activeDictation) { request in
