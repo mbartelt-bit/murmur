@@ -23,6 +23,13 @@ final class HomeViewModel: ObservableObject {
     @Published var keyboardEnabled = false
     /// The keyboard's Full Access heartbeat — `nil` until the keyboard has appeared once.
     @Published var fullAccess: Bool?
+    /// A recording the app was killed in the middle of, waiting to be finished (spec §9).
+    @Published var pendingRecovery: RecordingJournal.Pending?
+    /// One line under the banner when finishing it did not work. Survives a `reload()`,
+    /// because the reload that follows the failure would otherwise wipe it before it is read.
+    @Published var recoveryError: String?
+    /// The pipeline is running over the recovered audio: the two buttons wait for it.
+    @Published var isFinishingRecovery = false
 
     /// This iPhone has an Action Button, so Home offers to set it up. Hardware never changes
     /// under a running app, so it is read once.
@@ -36,6 +43,8 @@ final class HomeViewModel: ObservableObject {
     private let pasteboard: (String) -> Void
     private let keyboardEnabledProvider: () -> Bool
     private let fullAccessProvider: () -> Bool?
+    private let recoveryProvider: () -> RecordingJournal.Pending?
+    private let loader: (RecordingJournal.Pending) throws -> [Float]
     private var copyResetTask: Task<Void, Never>?
 
     /// `permissions` and `copy` are injected after `app` so the documented `init(app:)` call
@@ -46,7 +55,9 @@ final class HomeViewModel: ObservableObject {
         copy: @escaping (String) -> Void = { UIPasteboard.general.string = $0 },
         keyboardEnabledProvider: @escaping () -> Bool = { KeyboardStatus.isEnabled() },
         fullAccessProvider: @escaping () -> Bool? = { KeyboardStatus.hasFullAccess() },
-        hasActionButton: Bool = KeyboardStatus.hasActionButton
+        hasActionButton: Bool = KeyboardStatus.hasActionButton,
+        recoveryProvider: @escaping () -> RecordingJournal.Pending? = { RecordingJournal.pending() },
+        loader: @escaping (RecordingJournal.Pending) throws -> [Float] = RecordingJournal.load
     ) {
         self.app = app
         self.permissions = permissions
@@ -54,6 +65,8 @@ final class HomeViewModel: ObservableObject {
         self.keyboardEnabledProvider = keyboardEnabledProvider
         self.fullAccessProvider = fullAccessProvider
         self.hasActionButton = hasActionButton
+        self.recoveryProvider = recoveryProvider
+        self.loader = loader
     }
 
     /// The speech chip only exists while the on-device engine is the one that would run: a
@@ -82,12 +95,59 @@ final class HomeViewModel: ObservableObject {
 
         keyboardEnabled = keyboardEnabledProvider()
         fullAccess = fullAccessProvider()
+        // Not while one is being finished: the provider reads the same directory the pipeline
+        // is still reading from, and the banner must not flicker back mid-run.
+        if !isFinishingRecovery { pendingRecovery = recoveryProvider() }
 
         recent = (try? app.history.recent(Self.recentCount)) ?? []
     }
 
     func startDictation() {
+        recoveryError = nil
         app.startInAppDictation()
+    }
+
+    // MARK: - Finish the last dictation
+
+    /// Runs the journalled audio through the same pipeline a live dictation uses, so the
+    /// recovered text is written to history, cleaned and copied exactly like any other — the
+    /// recent list below the banner is where the user sees it (spec §9).
+    ///
+    /// The file is deleted either way. A recording that could not be transcribed once will not
+    /// transcribe on the second tap, and an offer that never goes away is worse than a lost
+    /// dictation.
+    func finishPending() async {
+        guard let pending = pendingRecovery, !isFinishingRecovery else { return }
+        isFinishingRecovery = true
+        recoveryError = nil
+
+        do {
+            let samples = try loader(pending)
+            let outcome = try await app.pipeline.run(
+                audio: RecordingJournal.chunks(from: samples),
+                source: .inApp,
+                partial: { _ in }
+            )
+            if app.settings.settings.copyToClipboard {
+                pasteboard(outcome.transcript.cleanText)
+            }
+        } catch {
+            recoveryError = Copy.recoveryFailed
+        }
+
+        RecordingJournal.discard(pending)
+        isFinishingRecovery = false
+        pendingRecovery = nil
+        reload()
+    }
+
+    /// "No thanks": the audio goes, nothing is transcribed, nothing is written.
+    func discardPending() {
+        guard let pending = pendingRecovery else { return }
+        RecordingJournal.discard(pending)
+        recoveryError = nil
+        pendingRecovery = nil
+        reload()
     }
 
     /// Same behaviour as a History row: tap copies the cleaned text and shows a check.

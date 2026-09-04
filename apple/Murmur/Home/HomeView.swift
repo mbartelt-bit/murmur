@@ -26,6 +26,7 @@ struct HomeView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
+                    recovery
                     dictateButton
                     chips
                     recent
@@ -47,6 +48,59 @@ struct HomeView: View {
     }
 
     // MARK: - Pieces
+
+    /// The one thing on Home that is more urgent than the dictate button, and only ever after
+    /// a crash: audio Murmur recorded but never got to transcribe (spec §9). It sits above
+    /// everything because the offer expires the moment the user starts a new dictation and
+    /// forgets the old one.
+    @ViewBuilder
+    private var recovery: some View {
+        if let pending = viewModel.pendingRecovery {
+            Card {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(Copy.recoveryTitle)
+                        .font(.subheadline.weight(.semibold))
+                    Text(Copy.recoveryBody(Copy.recoveryDuration(pending.duration)))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+
+                    HStack(spacing: 10) {
+                        Button {
+                            Task { await viewModel.finishPending() }
+                        } label: {
+                            Group {
+                                if viewModel.isFinishingRecovery {
+                                    ProgressView().tint(.white)
+                                } else {
+                                    Text(Copy.recoveryFinish)
+                                }
+                            }
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 9)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Color.murmurIndigo)
+
+                        Button { viewModel.discardPending() } label: {
+                            Text(Copy.recoveryDiscard)
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 9)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    .disabled(viewModel.isFinishingRecovery)
+                }
+            }
+        } else if let error = viewModel.recoveryError {
+            Card {
+                Text(error)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
 
     private var dictateButton: some View {
         Button {

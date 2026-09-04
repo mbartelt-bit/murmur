@@ -36,6 +36,7 @@
 		68CD4D751C1034533737645F /* MurmurKeyboardUI in Frameworks */ = {isa = PBXBuildFile; productRef = 540EA1160DC8F05A77D37FF5 /* MurmurKeyboardUI */; };
 		6DA49FB9CCA842FA4B2688C0 /* MurmurApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED35761EBF7EF881FA0E7BB9 /* MurmurApp.swift */; };
 		72AD50EE085019C02CBFC158 /* RecorderViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFEFBC442B76041590F814C2 /* RecorderViewModelTests.swift */; };
+		73E011DAA25A5BF238AC23A0 /* RecordingJournalTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C01DADF5E7DE10D8508D3409 /* RecordingJournalTests.swift */; };
 		74ECE6E3168B85AF31BA35A3 /* HandoffTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B80931EAFDBEEA125B85E5A /* HandoffTests.swift */; };
 		7FF0F4CB61C1F4DA1D50C3F2 /* OnboardingViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FCF80DB61B282A9F8772499 /* OnboardingViewModelTests.swift */; };
 		8895D96CC5D6FA0BF39FCEF9 /* MurmurIntents in Frameworks */ = {isa = PBXBuildFile; productRef = 936DD12F531D78CDCD360767 /* MurmurIntents */; };
@@ -147,6 +148,7 @@
 		BADFC419D76FE3CB660FE61F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		BE88C50F31345F79BD1784EC /* DictationPipelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictationPipelineTests.swift; sourceTree = "<group>"; };
 		BFEFBC442B76041590F814C2 /* RecorderViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecorderViewModelTests.swift; sourceTree = "<group>"; };
+		C01DADF5E7DE10D8508D3409 /* RecordingJournalTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingJournalTests.swift; sourceTree = "<group>"; };
 		C834EC374C4A986C47F46292 /* Murmur.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Murmur.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C8FACC424A6D11033B17058A /* OnboardingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingViewModel.swift; sourceTree = "<group>"; };
 		CAEE5190C9F9A94793B77C7C /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
@@ -330,6 +332,7 @@
 				745B1FAABE84FAB73AC85298 /* KeychainTests.swift */,
 				1FCF80DB61B282A9F8772499 /* OnboardingViewModelTests.swift */,
 				BFEFBC442B76041590F814C2 /* RecorderViewModelTests.swift */,
+				C01DADF5E7DE10D8508D3409 /* RecordingJournalTests.swift */,
 				419F13E44B83582054D8A6D3 /* SettingsTests.swift */,
 				1ABB944B230B5227EF92C9D7 /* SilenceDetectorTests.swift */,
 			);
@@ -585,6 +588,7 @@
 				E361E6861DCD5F4C29328803 /* KeychainTests.swift in Sources */,
 				7FF0F4CB61C1F4DA1D50C3F2 /* OnboardingViewModelTests.swift in Sources */,
 				72AD50EE085019C02CBFC158 /* RecorderViewModelTests.swift in Sources */,
+				73E011DAA25A5BF238AC23A0 /* RecordingJournalTests.swift in Sources */,
 				ECD89E9762CD86CA88B0C5FF /* SettingsTests.swift in Sources */,
 				DBCF0AB1BB3AABA20886CBAA /* SilenceDetectorTests.swift in Sources */,
 			);

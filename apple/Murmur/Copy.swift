@@ -121,6 +121,26 @@ enum Copy {
     static let chipTapToAllow = "Tap to allow"
     static let chipTapToFix = "Tap to fix"
 
+    // MARK: - Home · finish the last dictation (spec §9, "App killed mid-recording")
+
+    static let recoveryTitle = "Finish last dictation?"
+    /// `duration` comes from ``recoveryDuration(_:)`` — "about 12 s".
+    static func recoveryBody(_ duration: String) -> String {
+        String(format: "Murmur was closed while recording %@ of audio.", duration)
+    }
+
+    /// Deliberately vague: the journal is written every two seconds, so the number is only
+    /// ever approximately what the user said, and "about" is the honest way to say so.
+    static func recoveryDuration(_ seconds: TimeInterval) -> String {
+        "about \(Int(seconds.rounded())) s"
+    }
+
+    /// The same words as the onboarding and keyboard buttons, kept separate so either can be
+    /// reworded without dragging the other with it.
+    static let recoveryFinish = "Finish"
+    static let recoveryDiscard = "Discard"
+    static let recoveryFailed = "Couldn't finish it — the audio was too short or the engine failed."
+
     static let chipKeyboard = "Keyboard"
     static let chipFullAccess = "Full Access"
     static let chipActionButton = "Action Button"

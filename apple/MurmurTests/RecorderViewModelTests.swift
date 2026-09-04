@@ -15,6 +15,9 @@ final class RecorderViewModelTests: XCTestCase {
     private var secrets: InMemorySecretStore!
     private var history: HistoryStore!
     private var sleeper: FakeSleeper!
+    /// Where the recorder's crash journal is allowed to write. Never the App Group: a test
+    /// run must not leave a "finish last dictation" offer on the developer's own phone.
+    private var journalDirectory: URL!
 
     override func setUpWithError() throws {
         try super.setUpWithError()
@@ -24,6 +27,9 @@ final class RecorderViewModelTests: XCTestCase {
         secrets = InMemorySecretStore()
         history = try HistoryStore.inMemory()
         sleeper = FakeSleeper()
+        journalDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("recorder-journal-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: journalDirectory, withIntermediateDirectories: true)
     }
 
     override func tearDownWithError() throws {
@@ -36,7 +42,14 @@ final class RecorderViewModelTests: XCTestCase {
         settings = nil
         secrets = nil
         history = nil
+        try? FileManager.default.removeItem(at: journalDirectory)
+        journalDirectory = nil
         try super.tearDownWithError()
+    }
+
+    /// Everything the journal left behind, which after any finished dictation must be nothing.
+    private func journalFiles() -> [String] {
+        ((try? FileManager.default.contentsOfDirectory(atPath: journalDirectory.path)) ?? []).sorted()
     }
 
     // MARK: - Fakes
@@ -220,7 +233,8 @@ final class RecorderViewModelTests: XCTestCase {
             requestMic: requestMic,
             copy: copy,
             defaults: defaults,
-            sleeper: sleeper.sleep
+            sleeper: sleeper.sleep,
+            journalFactory: { [journalDirectory] in RecordingJournal(directory: journalDirectory!) }
         )
     }
 
@@ -637,6 +651,46 @@ final class RecorderViewModelTests: XCTestCase {
 
         XCTAssertEqual(audio.starts, 2)
         XCTAssertEqual(model.phase, .failed(message: "Didn't catch that."))
+    }
+
+    // MARK: - Crash journal
+
+    /// One chunk carrying the journal's whole flush threshold, so the file is written *during*
+    /// the recording rather than only by the flush in `stop()` — otherwise these two tests
+    /// would pass on a journal that never wrote anything at all.
+    private func twoSecondsOfSpeech() -> AudioChunk {
+        AudioChunk(
+            samples16kMono: Array(repeating: 0.5, count: RecordingJournal.flushThreshold),
+            level: 0.5,
+            buffer: buffer()
+        )
+    }
+
+    @MainActor
+    func testACompletedDictationLeavesNoJournalBehind() async {
+        let audio = FakeAudio()
+        audio.chunks = [twoSecondsOfSpeech()] + speechThenSilence()
+        let model = makeModel(audio: audio, engine: FakeEngine("hello there"))
+
+        await model.start()
+
+        XCTAssertTrue(Self.isDone(model.phase), "phase is \(Self.name(model.phase))")
+        XCTAssertEqual(try? history.list().count, 1)
+        XCTAssertEqual(journalFiles(), [], "the words are in history; nothing may be offered back")
+    }
+
+    @MainActor
+    func testAFailedDictationLeavesNoJournalBehind() async {
+        let audio = FakeAudio()
+        audio.chunks = [twoSecondsOfSpeech()] + speechThenSilence()
+        let model = makeModel(audio: audio, engine: FakeEngine(""))
+
+        await model.start()
+
+        XCTAssertEqual(model.phase, .failed(message: "Didn't catch that."))
+        // The user is reading "Didn't catch that." with a Try again button in front of them:
+        // Home must not also offer them the same audio on the next launch.
+        XCTAssertEqual(journalFiles(), [])
     }
 }
 
