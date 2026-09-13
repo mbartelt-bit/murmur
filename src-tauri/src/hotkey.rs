@@ -29,8 +29,8 @@ pub enum ReleaseAction {
     Ignore,
 }
 
-/// Pure state machine: hold-to-talk unless the second tap arrives within `DOUBLE_TAP_MS` of the
-/// first release, in which case it latches (toggle on/off).
+/// Pure state machine: hold-to-talk unless two short taps arrive within
+/// `DOUBLE_TAP_MS` of one another. Holding either press cancels latching.
 ///
 /// # Refinement vs. brief
 /// Both `on_press` and `on_release` accept an explicit `now_ms: u64` parameter instead of reading
@@ -39,8 +39,9 @@ pub enum ReleaseAction {
 /// production behavior is identical (one consistent clock source per event).
 #[derive(Default)]
 pub struct DoubleTap {
-    /// Timestamp (ms) of the most recent key-release, if any.
+    /// Timestamp of the most recent short tap's release, if any.
     last_release_ms: Option<u64>,
+    pressed_at_ms: Option<u64>,
     /// True while we are in toggle-on (latched) mode.
     latched: bool,
 }
@@ -50,9 +51,12 @@ impl DoubleTap {
     pub fn on_press(&mut self, now_ms: u64) -> PressAction {
         if self.latched {
             self.latched = false;
+            self.pressed_at_ms = None;
+            self.last_release_ms = None;
             return PressAction::ToggleOff;
         }
-        if let Some(prev) = self.last_release_ms {
+        self.pressed_at_ms = Some(now_ms);
+        if let Some(prev) = self.last_release_ms.take() {
             if now_ms.saturating_sub(prev) <= DOUBLE_TAP_MS {
                 self.latched = true;
                 return PressAction::ToggleOn;
@@ -64,10 +68,15 @@ impl DoubleTap {
     /// Called on key-release.  `now_ms` is the timestamp at the moment of release (injected by
     /// the caller so tests can supply fake clocks).
     pub fn on_release(&mut self, now_ms: u64) -> ReleaseAction {
-        if self.latched {
+        let short_tap = self.pressed_at_ms.take()
+            .is_some_and(|pressed| now_ms.saturating_sub(pressed) <= DOUBLE_TAP_MS);
+        if self.latched && short_tap {
             return ReleaseAction::Ignore;
         }
-        self.last_release_ms = Some(now_ms);
+        // Holding the second press means hold-to-talk, not a double-tap.
+        // A long recording (or the press that stops a latch) must not arm one.
+        self.latched = false;
+        self.last_release_ms = short_tap.then_some(now_ms);
         ReleaseAction::Stop
     }
 }
@@ -311,6 +320,37 @@ mod tests {
         // Second press 600 ms after release (1700 - 1100 = 600 > 400) → StartHold
         assert_eq!(d.on_press(1700), PressAction::StartHold);
         assert_eq!(d.on_release(1800), ReleaseAction::Stop);
+    }
+
+    #[test]
+    fn quick_restart_after_long_recording_does_not_latch() {
+        let mut d = DoubleTap::default();
+        assert_eq!(d.on_press(1000), PressAction::StartHold);
+        assert_eq!(d.on_release(6000), ReleaseAction::Stop);
+        assert_eq!(d.on_press(6100), PressAction::StartHold);
+        assert_eq!(d.on_release(9000), ReleaseAction::Stop);
+    }
+
+    #[test]
+    fn holding_second_press_cancels_double_tap_latch() {
+        let mut d = DoubleTap::default();
+        d.on_press(1000);
+        d.on_release(1100);
+        assert_eq!(d.on_press(1200), PressAction::ToggleOn);
+        assert_eq!(d.on_release(5000), ReleaseAction::Stop);
+        assert_eq!(d.on_press(5100), PressAction::StartHold);
+    }
+
+    #[test]
+    fn stopping_latch_does_not_arm_another_double_tap() {
+        let mut d = DoubleTap::default();
+        d.on_press(1000);
+        d.on_release(1100);
+        d.on_press(1200);
+        assert_eq!(d.on_release(1300), ReleaseAction::Ignore);
+        assert_eq!(d.on_press(5000), PressAction::ToggleOff);
+        assert_eq!(d.on_release(5100), ReleaseAction::Stop);
+        assert_eq!(d.on_press(5200), PressAction::StartHold);
     }
 
     /// parse_accelerator round-trip: valid strings parse without error.

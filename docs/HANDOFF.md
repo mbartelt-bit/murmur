@@ -12,7 +12,12 @@ and the user confirmed substantially better responsiveness after cloud STT began
 reusing its HTTP client. Timing logs now distinguish transcription, cleanup,
 and insertion without logging dictated text in those timing messages.
 
-Validation: 40 Rust tests passed (2 environment-dependent tests ignored), and
+A subsequent report of recording remaining active exposed overly broad
+double-tap detection. Latching now requires two short taps: restarting quickly
+after a long hold or holding the second press stops normally on release.
+Regression tests also cover stopping a latch without arming another one.
+
+Validation: 43 Rust tests passed (2 environment-dependent tests ignored), and
 the standalone release build with `custom-protocol` and `--check-install` passed.
 The updated user service was restarted and verified active. Local sample
 transcription and compositor paste were also tested during the port.

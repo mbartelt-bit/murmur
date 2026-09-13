@@ -57,8 +57,9 @@ Secret Service keyring, not in configuration files.
 ## Dictate
 
 Focus a text field in the destination application. Hold **Ctrl+Alt+D**, speak,
-and release D to transcribe and paste. Double-tap the shortcut to latch recording;
-press it again to stop. Fn on a PC keyboard is usually handled by firmware and is
+and release D to transcribe and paste. Two short taps latch recording;
+press it again to stop. Holding either press longer than 400 ms keeps normal
+hold-to-talk behavior, so releasing D ends the recording. Fn on a PC keyboard is usually handled by firmware and is
 not the macOS globe-key recording trigger.
 
 Close the settings window to keep Murmur running. Use the tray menu or app menu
