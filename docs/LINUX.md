@@ -15,9 +15,11 @@ omarchy pkg add rust cmake clang base-devel webkit2gtk-4.1 alsa-lib \
 ```
 
 Node.js/npm and Python 3 are also required (already supplied by Omarchy).
-Then, inside the checkout:
+Clone the repository, then build and install:
 
 ```sh
+git clone https://github.com/mbartelt-bit/murmur.git
+cd murmur
 npm ci
 npm run build
 cargo build --release --features custom-protocol --manifest-path src-tauri/Cargo.toml
@@ -83,6 +85,12 @@ systemctl --user status murmur
 journalctl --user -u murmur -n 60 --no-pager
 hyprctl configerrors
 ```
+
+For slow dictation, look for `Murmur timing` in the service log. It reports
+transcription, cleanup, and insertion durations separately, plus the total time
+after recording stops. These timing messages do not contain dictated text.
+Cloud transcription reuses its HTTP connection pool between recordings to avoid
+repeated connection setup; response time still depends on the provider and network.
 
 Select the intended default microphone in Omarchy's audio controls. The app uses
 ALSA's default input (PipeWire on Omarchy). If you change microphones, start a new

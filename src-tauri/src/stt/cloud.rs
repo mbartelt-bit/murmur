@@ -1,5 +1,13 @@
 use super::SttEngine;
 use zeroize::Zeroizing;
+use std::sync::OnceLock;
+
+// Engines are rebuilt for each dictation, but the HTTP connection pool should
+// survive so consecutive recordings don't each pay for a new TLS connection.
+fn client() -> &'static reqwest::blocking::Client {
+    static CLIENT: OnceLock<reqwest::blocking::Client> = OnceLock::new();
+    CLIENT.get_or_init(reqwest::blocking::Client::new)
+}
 
 #[derive(serde::Deserialize)]
 struct TranscriptionResponse {
@@ -48,8 +56,7 @@ impl SttEngine for CloudStt {
         }
 
         let url = format!("{}/audio/transcriptions", self.base_url);
-        let client = reqwest::blocking::Client::new();
-        let response = client
+        let response = client()
             .post(&url)
             .bearer_auth(self.api_key.as_str())
             .multipart(form)

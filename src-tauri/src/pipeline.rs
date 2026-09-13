@@ -132,6 +132,7 @@ impl PttSink for Pipeline {
             return;
         };
         eprintln!("Murmur: recording stopped; transcribing");
+        let stopped_at = std::time::Instant::now();
         // Tell the audio thread to finish and hand back its samples.
         let _ = session.stop_tx.send(());
         let samples_rx = session.samples_rx;
@@ -166,6 +167,7 @@ impl PttSink for Pipeline {
             }
 
             let engine = stt::make_engine(&app);
+            let transcription_started = std::time::Instant::now();
             let raw = match engine.transcribe(&audio16k, "") {
                 Ok(t) => t,
                 Err(e) => {
@@ -176,8 +178,12 @@ impl PttSink for Pipeline {
                     return;
                 }
             };
+            eprintln!("Murmur timing: transcription={}ms audio={}ms",
+                transcription_started.elapsed().as_millis(), audio16k.len() / 16);
 
+            let cleanup_started = std::time::Instant::now();
             let clean = cleanup::make_engine(&app).clean(&raw);
+            eprintln!("Murmur timing: cleanup={}ms", cleanup_started.elapsed().as_millis());
             let result = DictationResult {
                 raw,
                 clean: clean.clone(),
@@ -188,17 +194,19 @@ impl PttSink for Pipeline {
             let _ = app.emit("dictation-complete", result.clone());
 
             if is_insertable(&result) {
+                let insertion_started = std::time::Instant::now();
                 if let Err(e) = insert::insert_text(&clean) {
                     eprintln!("Murmur: insertion failed: {e}");
                     let _ = app.emit("dictation-error", e);
                 }
+                eprintln!("Murmur timing: insertion={}ms", insertion_started.elapsed().as_millis());
             } else {
                 let _ = app.emit("dictation-empty", ());
             }
 
             let _ = app.emit("hud-state", "idle");
             windows::hide_hud(&app);
-            eprintln!("Murmur: dictation complete");
+            eprintln!("Murmur: dictation complete; stop-to-complete={}ms", stopped_at.elapsed().as_millis());
         });
     }
 }
