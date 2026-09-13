@@ -14,7 +14,7 @@
     "withGlobalTauri": false,
     "windows": [
       { "label": "settings", "title": "Murmur", "width": 760, "height": 560, "visible": false, "resizable": true },
-      { "label": "hud", "url": "hud.html", "width": 260, "height": 72, "x": 40, "y": 40,
+      { "label": "hud", "title": "Murmur HUD", "url": "hud.html", "width": 260, "height": 72, "x": 40, "y": 40,
         "transparent": true, "decorations": false, "alwaysOnTop": true,
         "skipTaskbar": true, "shadow": false, "focus": false, "resizable": false, "visible": false }
     ],

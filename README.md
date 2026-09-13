@@ -3,10 +3,15 @@
 Hold a key, speak, and transcribed + cleaned-up text pastes at your cursor. A local-first
 voice dictation tray app — on-device Whisper by default, bring-your-own-key cloud STT optional.
 
-Tauri 2 + React + TypeScript. macOS today; Windows port in progress
+Tauri 2 + React + TypeScript. macOS, Linux on Omarchy/Hyprland, and a Windows port in progress
 (W0 — compiles and tests green on both platforms, see
 [docs/superpowers/plans/2026-07-25-murmur-windows-port.md](docs/superpowers/plans/2026-07-25-murmur-windows-port.md)).
 Deep architecture + gotchas: [docs/HANDOFF.md](docs/HANDOFF.md).
+
+## Linux / Omarchy
+
+See [the Linux installation guide](docs/LINUX.md) for native local dictation,
+Wayland paste, and a desktop launcher with Ctrl+Alt+D push-to-talk.
 
 ## Build prerequisites
 
@@ -54,7 +59,7 @@ npm ci
 npx vitest run                                    # frontend tests
 npm run build                                     # tsc + vite -> dist/
 cargo test  --manifest-path src-tauri/Cargo.toml  # Rust tests (compiles whisper.cpp; first run 10+ min)
-cargo build --manifest-path src-tauri/Cargo.toml
+cargo build --features custom-protocol --manifest-path src-tauri/Cargo.toml
 ```
 
 Dev loop: `npm run tauri dev`. On macOS, permission-sensitive features (mic, input

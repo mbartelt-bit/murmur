@@ -1,5 +1,31 @@
 # Murmur — Session Handoff
 
+## Omarchy update — 2026-09-13
+
+The `feat/omarchy-linux` branch adds native Omarchy/Hyprland integration,
+a user-level installer, Linux setup instructions, and Linux CI. Start with
+[LINUX.md](LINUX.md) for the current Linux build and installation workflow.
+The macOS notes below are historical context.
+
+The installed release was tested on Omarchy: physical dictation and paste work,
+and the user confirmed substantially better responsiveness after cloud STT began
+reusing its HTTP client. Timing logs now distinguish transcription, cleanup,
+and insertion without logging dictated text in those timing messages.
+
+A subsequent report of recording remaining active exposed overly broad
+double-tap detection. Latching now requires two short taps: restarting quickly
+after a long hold or holding the second press stops normally on release.
+Regression tests also cover stopping a latch without arming another one.
+
+Validation: 43 Rust tests passed (2 environment-dependent tests ignored), and
+the standalone release build with `custom-protocol` and `--check-install` passed.
+The updated user service was restarted and verified active. Local sample
+transcription and compositor paste were also tested during the port.
+macOS/Windows runtime behavior and Linux AppImage/deb bundles were not tested
+on this machine; CI covers the platform builds and automated tests.
+
+---
+
 **Last updated:** 2026-07-03 · main @ `3a65eb9` · pushed to https://github.com/mbartelt-bit/murmur (private)
 **Platform:** macOS-first. Tauri v2 (Rust core) + React/TS (Vite). Local-first, BYOK cloud optional.
 

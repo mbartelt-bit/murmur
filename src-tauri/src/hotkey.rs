@@ -1,7 +1,15 @@
+#[cfg(any(test, not(target_os = "linux")))]
 use std::str::FromStr;
+#[cfg(not(target_os = "linux"))]
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
+use tauri::AppHandle;
+#[cfg(not(target_os = "linux"))]
+use tauri::{Emitter, Manager};
+#[cfg(any(test, not(target_os = "linux")))]
+use tauri_plugin_global_shortcut::Shortcut;
+#[cfg(not(target_os = "linux"))]
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+#[cfg(not(target_os = "linux"))]
 use tauri_plugin_store::StoreExt;
 
 /// How long (ms) the second tap must arrive after the first release to count as a double-tap.
@@ -21,8 +29,8 @@ pub enum ReleaseAction {
     Ignore,
 }
 
-/// Pure state machine: hold-to-talk unless the second tap arrives within `DOUBLE_TAP_MS` of the
-/// first release, in which case it latches (toggle on/off).
+/// Pure state machine: hold-to-talk unless two short taps arrive within
+/// `DOUBLE_TAP_MS` of one another. Holding either press cancels latching.
 ///
 /// # Refinement vs. brief
 /// Both `on_press` and `on_release` accept an explicit `now_ms: u64` parameter instead of reading
@@ -31,8 +39,9 @@ pub enum ReleaseAction {
 /// production behavior is identical (one consistent clock source per event).
 #[derive(Default)]
 pub struct DoubleTap {
-    /// Timestamp (ms) of the most recent key-release, if any.
+    /// Timestamp of the most recent short tap's release, if any.
     last_release_ms: Option<u64>,
+    pressed_at_ms: Option<u64>,
     /// True while we are in toggle-on (latched) mode.
     latched: bool,
 }
@@ -42,9 +51,12 @@ impl DoubleTap {
     pub fn on_press(&mut self, now_ms: u64) -> PressAction {
         if self.latched {
             self.latched = false;
+            self.pressed_at_ms = None;
+            self.last_release_ms = None;
             return PressAction::ToggleOff;
         }
-        if let Some(prev) = self.last_release_ms {
+        self.pressed_at_ms = Some(now_ms);
+        if let Some(prev) = self.last_release_ms.take() {
             if now_ms.saturating_sub(prev) <= DOUBLE_TAP_MS {
                 self.latched = true;
                 return PressAction::ToggleOn;
@@ -56,16 +68,22 @@ impl DoubleTap {
     /// Called on key-release.  `now_ms` is the timestamp at the moment of release (injected by
     /// the caller so tests can supply fake clocks).
     pub fn on_release(&mut self, now_ms: u64) -> ReleaseAction {
-        if self.latched {
+        let short_tap = self.pressed_at_ms.take()
+            .is_some_and(|pressed| now_ms.saturating_sub(pressed) <= DOUBLE_TAP_MS);
+        if self.latched && short_tap {
             return ReleaseAction::Ignore;
         }
-        self.last_release_ms = Some(now_ms);
+        // Holding the second press means hold-to-talk, not a double-tap.
+        // A long recording (or the press that stops a latch) must not arm one.
+        self.latched = false;
+        self.last_release_ms = short_tap.then_some(now_ms);
         ReleaseAction::Stop
     }
 }
 
 // ── wall-clock helper (used only in `register`) ──────────────────────────────
 
+#[cfg(not(target_os = "linux"))]
 fn now_ms() -> u64 {
     use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now()
@@ -91,6 +109,7 @@ pub trait PttSink: Send + Sync {
 /// LOCK CONSTRAINT: the plugin handler holds `tap` locked across `PttSink::start`
 /// / `stop`.  A `PttSink` implementation MUST NOT acquire these mutexes (directly
 /// or transitively) or it will deadlock the hotkey handler.
+#[cfg(not(target_os = "linux"))]
 pub struct Hotkeys {
     pub current: Mutex<Shortcut>,
     pub tap: Mutex<DoubleTap>,
@@ -100,6 +119,7 @@ const DEFAULT_ACCELERATOR: &str = "Control+Alt+KeyD";
 
 /// Parse an accelerator string to a `Shortcut`, returning a user-facing error
 /// string on failure.
+#[cfg(any(test, not(target_os = "linux")))]
 pub fn parse_accelerator(accel: &str) -> Result<Shortcut, String> {
     Shortcut::from_str(accel).map_err(|_| "Invalid shortcut".to_string())
 }
@@ -116,6 +136,7 @@ pub fn parse_accelerator(accel: &str) -> Result<Shortcut, String> {
 /// On `Released`:
 ///   - `Stop`   → `sink.stop()`
 ///   - `Ignore` → (latched, do nothing)
+#[cfg(not(target_os = "linux"))]
 pub fn register(app: &AppHandle, sink: Arc<dyn PttSink>) -> tauri::Result<()> {
     // ── load saved accelerator from store ────────────────────────────────────
     let saved_accel: String = app
@@ -189,6 +210,7 @@ pub fn register(app: &AppHandle, sink: Arc<dyn PttSink>) -> tauri::Result<()> {
 
 /// Returns the current hotkey accelerator string (e.g. "control+alt+KeyD").
 #[tauri::command]
+#[cfg(not(target_os = "linux"))]
 pub fn get_hotkey(app: AppHandle) -> String {
     let state = app.state::<Arc<Hotkeys>>();
     let sc = state.current.lock().unwrap();
@@ -203,6 +225,7 @@ pub fn get_hotkey(app: AppHandle) -> String {
 ///   is returned.
 /// - On success, persists the new accelerator to `settings.json`.
 #[tauri::command]
+#[cfg(not(target_os = "linux"))]
 pub fn set_hotkey(app: AppHandle, accelerator: String) -> Result<(), String> {
     let new_sc = parse_accelerator(&accelerator)?;
 
@@ -235,6 +258,17 @@ pub fn set_hotkey(app: AppHandle, accelerator: String) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+#[tauri::command]
+#[cfg(target_os = "linux")]
+pub fn get_hotkey() -> String { DEFAULT_ACCELERATOR.to_owned() }
+
+#[tauri::command]
+#[cfg(target_os = "linux")]
+pub fn set_hotkey(accelerator: String) -> Result<(), String> {
+    let _ = accelerator;
+    Err("On Omarchy, change the Murmur shortcut in your Hyprland bindings.".into())
 }
 
 // ── unit tests ────────────────────────────────────────────────────────────────
@@ -286,6 +320,37 @@ mod tests {
         // Second press 600 ms after release (1700 - 1100 = 600 > 400) → StartHold
         assert_eq!(d.on_press(1700), PressAction::StartHold);
         assert_eq!(d.on_release(1800), ReleaseAction::Stop);
+    }
+
+    #[test]
+    fn quick_restart_after_long_recording_does_not_latch() {
+        let mut d = DoubleTap::default();
+        assert_eq!(d.on_press(1000), PressAction::StartHold);
+        assert_eq!(d.on_release(6000), ReleaseAction::Stop);
+        assert_eq!(d.on_press(6100), PressAction::StartHold);
+        assert_eq!(d.on_release(9000), ReleaseAction::Stop);
+    }
+
+    #[test]
+    fn holding_second_press_cancels_double_tap_latch() {
+        let mut d = DoubleTap::default();
+        d.on_press(1000);
+        d.on_release(1100);
+        assert_eq!(d.on_press(1200), PressAction::ToggleOn);
+        assert_eq!(d.on_release(5000), ReleaseAction::Stop);
+        assert_eq!(d.on_press(5100), PressAction::StartHold);
+    }
+
+    #[test]
+    fn stopping_latch_does_not_arm_another_double_tap() {
+        let mut d = DoubleTap::default();
+        d.on_press(1000);
+        d.on_release(1100);
+        d.on_press(1200);
+        assert_eq!(d.on_release(1300), ReleaseAction::Ignore);
+        assert_eq!(d.on_press(5000), PressAction::ToggleOff);
+        assert_eq!(d.on_release(5100), ReleaseAction::Stop);
+        assert_eq!(d.on_press(5200), PressAction::StartHold);
     }
 
     /// parse_accelerator round-trip: valid strings parse without error.

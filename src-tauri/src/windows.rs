@@ -18,10 +18,12 @@ pub fn show_settings(app: &AppHandle) {
 
 pub fn show_hud(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("hud") {
-        // Non-interactive overlay: never steal clicks from the app beneath it.
-        let _ = w.set_ignore_cursor_events(true);
         position_bottom_center(&w);
         let _ = w.show();
+        // GTK creates the native window on first show. Setting its input shape
+        // while still unrealized panics in Tao's CursorIgnoreEvents handler.
+        // The HUD's focus=false and compositor rules prevent stealing focus.
+        let _ = w.set_ignore_cursor_events(true);
     }
 }
 
