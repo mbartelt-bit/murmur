@@ -1,12 +1,14 @@
 use crate::{
     audio,
     cleanup,
-    hotkey::{self, PttSink},
+    hotkey::PttSink,
     insert,
     resample,
     stt,
     windows,
 };
+#[cfg(not(target_os = "linux"))]
+use crate::hotkey;
 use serde::Serialize;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
@@ -103,6 +105,7 @@ impl PttSink for Pipeline {
         // Bounded so a hung mic init can't freeze the hotkey caller forever.
         match ready_rx.recv_timeout(std::time::Duration::from_secs(5)) {
             Ok(Ok(())) => {
+                eprintln!("Murmur: recording started");
                 windows::show_hud(&app);
                 *self.session.lock().unwrap() = Some(Session {
                     stop_tx,
@@ -110,7 +113,9 @@ impl PttSink for Pipeline {
                 });
             }
             Ok(Err(e)) => {
+                eprintln!("Murmur: microphone failed: {e}");
                 let _ = app.emit("dictation-error", e);
+                let _ = app.emit("hud-state", "idle");
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {
                 let _ = app.emit("dictation-error", "Couldn't start the microphone in time.".to_string());
@@ -126,6 +131,7 @@ impl PttSink for Pipeline {
         let Some(session) = session else {
             return;
         };
+        eprintln!("Murmur: recording stopped; transcribing");
         // Tell the audio thread to finish and hand back its samples.
         let _ = session.stop_tx.send(());
         let samples_rx = session.samples_rx;
@@ -151,11 +157,19 @@ impl PttSink for Pipeline {
                 interleaved
             };
             let audio16k = resample::resample_linear(&mono, sr, 16000);
+            // A quick latch tap or silence is not speech. Avoid Whisper hallucinations.
+            if audio16k.len() < 4800 || audio::rms(&audio16k) < 0.0001 {
+                let _ = app.emit("dictation-empty", ());
+                let _ = app.emit("hud-state", "idle");
+                windows::hide_hud(&app);
+                return;
+            }
 
             let engine = stt::make_engine(&app);
             let raw = match engine.transcribe(&audio16k, "") {
                 Ok(t) => t,
                 Err(e) => {
+                    eprintln!("Murmur: transcription failed: {e}");
                     let _ = app.emit("dictation-error", e.to_string());
                     let _ = app.emit("hud-state", "idle");
                     windows::hide_hud(&app);
@@ -175,6 +189,7 @@ impl PttSink for Pipeline {
 
             if is_insertable(&result) {
                 if let Err(e) = insert::insert_text(&clean) {
+                    eprintln!("Murmur: insertion failed: {e}");
                     let _ = app.emit("dictation-error", e);
                 }
             } else {
@@ -183,17 +198,20 @@ impl PttSink for Pipeline {
 
             let _ = app.emit("hud-state", "idle");
             windows::hide_hud(&app);
+            eprintln!("Murmur: dictation complete");
         });
     }
 }
 
-pub fn init(app: &AppHandle) {
+pub fn init(app: &AppHandle) -> Arc<dyn PttSink> {
     let pipeline: Arc<dyn PttSink> = Arc::new(Pipeline::new());
     // fn-key (globe) push-to-talk listener, alongside the ⌃⌥D global shortcut.
     crate::ptt_key::start(app.clone(), pipeline.clone());
-    if let Err(e) = hotkey::register(app, pipeline) {
+    #[cfg(not(target_os = "linux"))]
+    if let Err(e) = hotkey::register(app, pipeline.clone()) {
         eprintln!("hotkey registration failed: {e}");
     }
+    pipeline
 }
 
 #[cfg(test)]

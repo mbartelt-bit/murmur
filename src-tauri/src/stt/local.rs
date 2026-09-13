@@ -21,7 +21,7 @@ impl SttEngine for LocalWhisper {
         // NOTE: `use_gpu` is a builder method (returns &mut Self) in 0.16 —
         // honored only when the `metal` feature is enabled (_gpu is set).
         let mut cparams = WhisperContextParameters::default();
-        cparams.use_gpu(true);
+        cparams.use_gpu(cfg!(target_os = "macos"));
 
         // new_with_params takes &Path (not &str) in 0.16
         let ctx = WhisperContext::new_with_params(&self.model_path, cparams)?;
@@ -55,5 +55,20 @@ impl SttEngine for LocalWhisper {
         }
 
         Ok(text.trim().to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    #[ignore = "Requires MURMUR_TEST_MODEL and MURMUR_TEST_AUDIO (16kHz mono f32le JFK sample)"]
+    fn transcribes_real_sample_locally() {
+        let model = std::env::var_os("MURMUR_TEST_MODEL").expect("model path");
+        let bytes = std::fs::read(std::env::var_os("MURMUR_TEST_AUDIO").expect("audio path")).unwrap();
+        let audio: Vec<f32> = bytes.chunks_exact(4)
+            .map(|b| f32::from_le_bytes(b.try_into().unwrap())).collect();
+        let text = LocalWhisper::new(model.into()).transcribe(&audio, "").unwrap();
+        assert!(text.to_lowercase().contains("ask not"), "Unexpected transcript: {text}");
     }
 }

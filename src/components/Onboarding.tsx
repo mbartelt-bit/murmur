@@ -13,6 +13,7 @@ import {
 import { EngineSettings } from "./EngineSettings";
 
 export function Onboarding({ onReady }: { onReady: () => void }) {
+  const isLinux = /Linux/.test(navigator.platform);
   const [mic, setMic] = useState<string>("notDetermined");
   const [ax, setAx] = useState<boolean>(false);
   const [im, setIm] = useState<boolean>(false);
@@ -107,7 +108,7 @@ export function Onboarding({ onReady }: { onReady: () => void }) {
         </OnboardRow>
 
         {/* Accessibility */}
-        <OnboardRow
+        {!isLinux && <OnboardRow
           label="Accessibility"
           hint="Needed for paste-on-cursor and the global hotkey."
           ok={ax}
@@ -138,10 +139,10 @@ export function Onboarding({ onReady }: { onReady: () => void }) {
               </button>
             </div>
           )}
-        </OnboardRow>
+        </OnboardRow>}
 
         {/* Input Monitoring — needed for the fn (globe) push-to-talk key */}
-        <OnboardRow
+        {!isLinux && <OnboardRow
           label="Input Monitoring"
           hint="Lets you hold the fn (globe) key to dictate. Relaunch Murmur after granting."
           ok={im}
@@ -172,7 +173,7 @@ export function Onboarding({ onReady }: { onReady: () => void }) {
               </button>
             </div>
           )}
-        </OnboardRow>
+        </OnboardRow>}
 
         {/* Transcription — embedded EngineSettings, no border after */}
         <div style={{ paddingTop: 14 }}>
@@ -208,7 +209,7 @@ export function Onboarding({ onReady }: { onReady: () => void }) {
           Restart Murmur
         </button>
         <p style={{ margin: "6px 0 0", fontSize: 11, color: "var(--text-2)" }}>
-          Granted a permission in System Settings but it still shows pending? Restart to apply it.
+          {isLinux ? "Murmur uses your system’s default microphone. Select it in Omarchy’s audio settings." : "Granted a permission in System Settings but it still shows pending? Restart to apply it."}
         </p>
       </div>
     </div>

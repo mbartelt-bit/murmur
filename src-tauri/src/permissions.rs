@@ -189,8 +189,8 @@ pub fn open_url(url: String) {
             .args(["url.dll,FileProtocolHandler", &url])
             .spawn();
     }
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    #[cfg(target_os = "linux")]
     {
-        let _ = url;
+        let _ = std::process::Command::new("xdg-open").arg(url).spawn();
     }
 }

@@ -1,7 +1,15 @@
+#[cfg(any(test, not(target_os = "linux")))]
 use std::str::FromStr;
+#[cfg(not(target_os = "linux"))]
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
+use tauri::AppHandle;
+#[cfg(not(target_os = "linux"))]
+use tauri::{Emitter, Manager};
+#[cfg(any(test, not(target_os = "linux")))]
+use tauri_plugin_global_shortcut::Shortcut;
+#[cfg(not(target_os = "linux"))]
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+#[cfg(not(target_os = "linux"))]
 use tauri_plugin_store::StoreExt;
 
 /// How long (ms) the second tap must arrive after the first release to count as a double-tap.
@@ -66,6 +74,7 @@ impl DoubleTap {
 
 // ── wall-clock helper (used only in `register`) ──────────────────────────────
 
+#[cfg(not(target_os = "linux"))]
 fn now_ms() -> u64 {
     use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now()
@@ -91,6 +100,7 @@ pub trait PttSink: Send + Sync {
 /// LOCK CONSTRAINT: the plugin handler holds `tap` locked across `PttSink::start`
 /// / `stop`.  A `PttSink` implementation MUST NOT acquire these mutexes (directly
 /// or transitively) or it will deadlock the hotkey handler.
+#[cfg(not(target_os = "linux"))]
 pub struct Hotkeys {
     pub current: Mutex<Shortcut>,
     pub tap: Mutex<DoubleTap>,
@@ -100,6 +110,7 @@ const DEFAULT_ACCELERATOR: &str = "Control+Alt+KeyD";
 
 /// Parse an accelerator string to a `Shortcut`, returning a user-facing error
 /// string on failure.
+#[cfg(any(test, not(target_os = "linux")))]
 pub fn parse_accelerator(accel: &str) -> Result<Shortcut, String> {
     Shortcut::from_str(accel).map_err(|_| "Invalid shortcut".to_string())
 }
@@ -116,6 +127,7 @@ pub fn parse_accelerator(accel: &str) -> Result<Shortcut, String> {
 /// On `Released`:
 ///   - `Stop`   → `sink.stop()`
 ///   - `Ignore` → (latched, do nothing)
+#[cfg(not(target_os = "linux"))]
 pub fn register(app: &AppHandle, sink: Arc<dyn PttSink>) -> tauri::Result<()> {
     // ── load saved accelerator from store ────────────────────────────────────
     let saved_accel: String = app
@@ -189,6 +201,7 @@ pub fn register(app: &AppHandle, sink: Arc<dyn PttSink>) -> tauri::Result<()> {
 
 /// Returns the current hotkey accelerator string (e.g. "control+alt+KeyD").
 #[tauri::command]
+#[cfg(not(target_os = "linux"))]
 pub fn get_hotkey(app: AppHandle) -> String {
     let state = app.state::<Arc<Hotkeys>>();
     let sc = state.current.lock().unwrap();
@@ -203,6 +216,7 @@ pub fn get_hotkey(app: AppHandle) -> String {
 ///   is returned.
 /// - On success, persists the new accelerator to `settings.json`.
 #[tauri::command]
+#[cfg(not(target_os = "linux"))]
 pub fn set_hotkey(app: AppHandle, accelerator: String) -> Result<(), String> {
     let new_sc = parse_accelerator(&accelerator)?;
 
@@ -235,6 +249,17 @@ pub fn set_hotkey(app: AppHandle, accelerator: String) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+#[tauri::command]
+#[cfg(target_os = "linux")]
+pub fn get_hotkey() -> String { DEFAULT_ACCELERATOR.to_owned() }
+
+#[tauri::command]
+#[cfg(target_os = "linux")]
+pub fn set_hotkey(accelerator: String) -> Result<(), String> {
+    let _ = accelerator;
+    Err("On Omarchy, change the Murmur shortcut in your Hyprland bindings.".into())
 }
 
 // ── unit tests ────────────────────────────────────────────────────────────────

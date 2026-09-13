@@ -13,6 +13,8 @@ mod secrets;
 mod stt;
 mod wav;
 mod windows;
+#[cfg(target_os = "linux")]
+mod linux;
 
 use tauri::{
     menu::{Menu, MenuItem},
@@ -23,6 +25,21 @@ use tauri_plugin_sql::{Builder as SqlBuilder, Migration, MigrationKind};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Set before GTK/WebKit starts any threads. NVIDIA's explicit-sync path
+    // can terminate the Wayland connection when opening a webview (WebKit #280210).
+    // Other drivers ignore this NVIDIA-specific switch; retain user overrides.
+    #[cfg(target_os = "linux")]
+    if std::env::var_os("WAYLAND_DISPLAY").is_some()
+        && std::env::var_os("__NV_DISABLE_EXPLICIT_SYNC").is_none()
+    {
+        std::env::set_var("__NV_DISABLE_EXPLICIT_SYNC", "1");
+    }
+    #[cfg(target_os = "linux")]
+    let socket = match linux::prepare() {
+        Ok(Some(socket)) => socket,
+        Ok(None) => return,
+        Err(e) => { eprintln!("Murmur: {e}"); std::process::exit(1); }
+    };
     let migrations = vec![Migration {
         version: 1,
         description: "create_core_tables",
@@ -47,7 +64,7 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(SqlBuilder::default().add_migrations("sqlite:murmur.db", migrations).build())
         .plugin(tauri_plugin_store::Builder::new().build())
-        .setup(|app| {
+        .setup(move |app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
@@ -87,8 +104,10 @@ pub fn run() {
                         let _ = wc.hide();
                     }
                 });
-                let _ = w.show();
-                let _ = w.set_focus();
+                if !std::env::args().any(|arg| arg == "--background") {
+                    let _ = w.show();
+                    let _ = w.set_focus();
+                }
             }
 
             // Startup diagnostic — write the live permission state to a file so
@@ -103,7 +122,9 @@ pub fn run() {
                 let _ = std::fs::write(dir.join("diag.log"), diag);
             }
 
-            pipeline::init(app.handle());
+            let _pipeline = pipeline::init(app.handle());
+            #[cfg(target_os = "linux")]
+            linux::listen(app.handle().clone(), socket, _pipeline);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

@@ -65,6 +65,7 @@ pub fn secret_delete(key: String) -> std::result::Result<(), String> {
 mod tests {
     use super::*;
     #[test]
+    #[cfg_attr(target_os = "linux", ignore = "Requires an unlocked desktop Secret Service; run with --ignored")]
     fn roundtrip_and_delete() {
         let acct = "test-byok-key";
         set(acct, "sk-secret-123").unwrap();

@@ -89,6 +89,20 @@ const PURE_MODIFIER_CODES = new Set([
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function HotkeySetting() {
+  if (/Linux/.test(navigator.platform)) return <LinuxHotkeySetting />;
+  return <DesktopHotkeySetting />;
+}
+
+function LinuxHotkeySetting() {
+  return <div>
+    <div className="section-label">Push to talk</div>
+    <p>Hold <kbd className="kbd">Ctrl+Alt+D</kbd>, speak, then release to paste.</p>
+    <p style={{ fontSize: 12, color: "var(--text-2)" }}>Double-tap to keep recording; press again to finish. Keep the destination text field focused. Close this window to keep Murmur running in the tray.</p>
+    <p style={{ fontSize: 12, color: "var(--text-2)" }}>Change this shortcut in your Omarchy keyboard configuration.</p>
+  </div>;
+}
+
+function DesktopHotkeySetting() {
   const [accel, setAccel] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
