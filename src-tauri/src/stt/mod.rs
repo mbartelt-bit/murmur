@@ -1,7 +1,8 @@
 mod cloud;
 mod local;
+pub use local::LocalCache;
 use std::path::PathBuf;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use tauri_plugin_store::StoreExt;
 
 pub use cloud::CloudStt;
@@ -41,9 +42,16 @@ pub fn make_engine(app: &AppHandle) -> Box<dyn SttEngine + Send + Sync> {
             .ok()
             .flatten()
             .unwrap_or_default();
-        Box::new(cloud::CloudStt::new(provider.base_url(), provider.stt_model(), key))
+        Box::new(cloud::CloudStt::new(
+            provider.base_url(),
+            provider.stt_model(),
+            key,
+        ))
     } else {
-        Box::new(local::LocalWhisper::new(crate::model::model_path(app)))
+        Box::new(local::LocalWhisper::with_cache(
+            crate::model::model_path(app),
+            &app.state::<LocalCache>(),
+        ))
     }
 }
 

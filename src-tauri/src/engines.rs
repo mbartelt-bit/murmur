@@ -55,7 +55,10 @@ pub fn set_stt_engine(app: AppHandle, value: String) -> Result<(), String> {
 /// Persist the user's chosen cleanup engine. Valid values: "rule", "openai", "groq".
 #[tauri::command]
 pub fn set_cleanup_engine(app: AppHandle, value: String) -> Result<(), String> {
-    if !matches!(value.as_str(), "rule" | "openai" | "groq") {
+    if !matches!(
+        value.as_str(),
+        "rule" | "openai" | "groq" | "chatgpt" | "verbatim"
+    ) {
         return Err(format!("invalid cleanup_engine value: {:?}", value));
     }
     let store = app.store("settings.json").map_err(|e| e.to_string())?;
@@ -79,11 +82,7 @@ pub fn stt_ready(app: AppHandle) -> bool {
     if let Some(provider) = crate::provider::Provider::from_id(choice) {
         key_present(provider.key_account())
     } else {
-        // Local: model file must exist and be >1 MB
-        let p = crate::model::model_path(&app);
-        std::fs::metadata(&p)
-            .map(|m| m.len() > 1_000_000)
-            .unwrap_or(false)
+        crate::model::model_ready(app)
     }
 }
 

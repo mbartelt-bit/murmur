@@ -20,7 +20,7 @@ mod imp {
         CGEventFlags, CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement,
         CGEventType, CallbackResult,
     };
-    use tauri::{AppHandle, Emitter};
+    use tauri::AppHandle;
 
     use crate::hotkey::PttSink;
 
@@ -48,8 +48,11 @@ mod imp {
                         let sink_main = sink.clone();
                         // Hop to the main thread: start/stop touch Tauri windows.
                         let _ = app.run_on_main_thread(move || {
-                            if now {
-                                let _ = app_main.emit("hud-state", "recording");
+                            if crate::hotkey::toggle_mode(&app_main) {
+                                if now {
+                                    sink_main.toggle(&app_main);
+                                }
+                            } else if now {
                                 sink_main.start(&app_main);
                             } else {
                                 sink_main.stop(&app_main);

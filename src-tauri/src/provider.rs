@@ -22,7 +22,7 @@ impl Provider {
 
     pub fn stt_model(&self) -> &'static str {
         match self {
-            Self::OpenAI => "whisper-1",
+            Self::OpenAI => "gpt-transcribe",
             Self::Groq => "whisper-large-v3",
         }
     }
