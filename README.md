@@ -3,6 +3,21 @@
 Hold a key, speak, and transcribed + cleaned-up text pastes at your cursor. A local-first
 voice dictation tray app — on-device Whisper by default, bring-your-own-key cloud STT optional.
 
+## A more personal preview
+
+- Correct a dictation and teach Murmur names through repeated corrections.
+- Keep your own vocabulary, with learning off until you enable it.
+- Record with a shortcut or visible controls; choose Hold or Press once.
+- Review, search, copy and undo edits while preserving the original transcript.
+- Optional **Continue with ChatGPT** for text cleanup using an eligible plan.
+  This experimental connection does **not** provide audio transcription.
+- An [iPhone-first mobile companion](mobile/README.md), with Android support,
+  native on-device speech, editable drafts and sharing.
+
+This branch is a development preview. Public signed installers and store releases
+are not yet available from this work. See the [release plan](docs/PRODUCT-PLAN.md),
+[privacy notes](docs/PRIVACY.md), and [ChatGPT connection](docs/CHATGPT.md).
+
 Tauri 2 + React + TypeScript. macOS, Linux on Omarchy/Hyprland, and a Windows port in progress
 (W0 — compiles and tests green on both platforms, see
 [docs/superpowers/plans/2026-07-25-murmur-windows-port.md](docs/superpowers/plans/2026-07-25-murmur-windows-port.md)).
@@ -72,3 +87,7 @@ packaging (NSIS installer, signing) is milestone W4 of the port plan — until t
 ## Recommended IDE Setup
 
 - [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+
+## License and contributions
+
+[MIT](LICENSE). See [CONTRIBUTING.md](CONTRIBUTING.md) for checks and contribution guidelines.

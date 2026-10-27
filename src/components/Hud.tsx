@@ -27,11 +27,29 @@ export function Hud() {
       }}
     >
       <style>{`
+        @media (prefers-reduced-motion: reduce) { * { animation:none!important; } }
         @keyframes murmur-pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(.7);opacity:.55} }
         @keyframes murmur-glow  { 0%{transform:scale(1);opacity:.55} 70%,100%{transform:scale(2.4);opacity:0} }
         @keyframes murmur-wave  { 0%,100%{transform:scaleY(.25)} 50%{transform:scaleY(1)} }
       `}</style>
 
+      <span
+        role="status"
+        aria-live="polite"
+        style={{
+          position: "absolute",
+          width: 1,
+          height: 1,
+          overflow: "hidden",
+          clipPath: "inset(50%)",
+        }}
+      >
+        {state === "recording"
+          ? "Recording"
+          : state === "transcribing"
+            ? "Transcribing"
+            : "Ready"}
+      </span>
       {state === "recording" && <RecordingDot />}
       {state === "transcribing" && <SquiggleEq />}
     </div>

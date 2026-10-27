@@ -14,23 +14,28 @@ import { EngineSettings } from "./EngineSettings";
 
 export function Onboarding({ onReady }: { onReady: () => void }) {
   const isLinux = /Linux/.test(navigator.platform);
+  const [error, setError] = useState("");
   const [mic, setMic] = useState<string>("notDetermined");
   const [ax, setAx] = useState<boolean>(false);
   const [im, setIm] = useState<boolean>(false);
   const [ready, setReady] = useState<boolean>(false);
 
   const refresh = useCallback(async () => {
-    const [m, a, i, r] = await Promise.all([
-      micStatus(),
-      accessibilityTrusted(),
-      inputMonitoringTrusted(),
-      sttReady(),
-    ]);
-    setMic(m);
-    setAx(a);
-    setIm(i);
-    setReady(r);
-    if (m === "authorized" && a && i && r) onReady();
+    try {
+      const [m, a, i, r] = await Promise.all([
+        micStatus(),
+        accessibilityTrusted(),
+        inputMonitoringTrusted(),
+        sttReady(),
+      ]);
+      setMic(m);
+      setAx(a);
+      setIm(i);
+      setReady(r);
+      if (m === "authorized" && a && i && r) onReady();
+    } catch {
+      setError("Could not check setup. Restart Murmur to try again.");
+    }
   }, [onReady]);
 
   useEffect(() => {
@@ -51,6 +56,11 @@ export function Onboarding({ onReady }: { onReady: () => void }) {
         padding: "24px 16px 40px",
       }}
     >
+      {error && (
+        <p role="alert" className="notice error">
+          {error}
+        </p>
+      )}
       {/* Header */}
       <div style={{ textAlign: "center", marginBottom: 24 }}>
         {/* Mic icon */}
@@ -66,18 +76,53 @@ export function Onboarding({ onReady }: { onReady: () => void }) {
             margin: "0 auto 14px",
           }}
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+          >
             <rect x="9" y="3" width="6" height="10" rx="3" fill="white" />
-            <path d="M5 11a7 7 0 0 0 14 0" stroke="white" strokeWidth="2" strokeLinecap="round" fill="none" />
-            <line x1="12" y1="18" x2="12" y2="21" stroke="white" strokeWidth="2" strokeLinecap="round" />
-            <line x1="9" y1="21" x2="15" y2="21" stroke="white" strokeWidth="2" strokeLinecap="round" />
+            <path
+              d="M5 11a7 7 0 0 0 14 0"
+              stroke="white"
+              strokeWidth="2"
+              strokeLinecap="round"
+              fill="none"
+            />
+            <line
+              x1="12"
+              y1="18"
+              x2="12"
+              y2="21"
+              stroke="white"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+            <line
+              x1="9"
+              y1="21"
+              x2="15"
+              y2="21"
+              stroke="white"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
           </svg>
         </div>
-        <h1 style={{ fontSize: 20, fontWeight: 700, color: "var(--text)", marginBottom: 4 }}>
+        <h1
+          style={{
+            fontSize: 20,
+            fontWeight: 700,
+            color: "var(--text)",
+            marginBottom: 4,
+          }}
+        >
           Welcome to Murmur
         </h1>
         <p style={{ fontSize: 13, color: "var(--text-2)", margin: 0 }}>
-          Set up permissions and your transcription engine to get started.
+          A thought, into words. Let’s get your first dictation ready.
         </p>
       </div>
 
@@ -108,96 +153,154 @@ export function Onboarding({ onReady }: { onReady: () => void }) {
         </OnboardRow>
 
         {/* Accessibility */}
-        {!isLinux && <OnboardRow
-          label="Accessibility"
-          hint="Needed for paste-on-cursor and the global hotkey."
-          ok={ax}
-        >
-          {!ax && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
-              <button
-                className="btn btn-primary"
-                style={{ padding: "5px 12px", fontSize: 12 }}
-                onClick={async () => {
-                  // Fire ONLY the system prompt. It registers Murmur in the
-                  // Accessibility list and has its own "Open System Settings"
-                  // button. We must NOT also open the pane here — doing both
-                  // strands the dialog behind Settings, forcing the user to
-                  // hit Deny (which records a denial) just to close it.
-                  await promptAccessibility();
-                  refresh();
+        {!isLinux && (
+          <OnboardRow
+            label="Accessibility"
+            hint="Needed for paste-on-cursor and the global hotkey."
+            ok={ax}
+          >
+            {!ax && (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 6,
+                  alignItems: "flex-end",
                 }}
               >
-                Allow accessibility
-              </button>
-              <button
-                className="btn btn-ghost"
-                style={{ padding: "2px 8px", fontSize: 11 }}
-                onClick={() => openPrivacyPane("accessibility")}
-              >
-                Open Settings manually
-              </button>
-            </div>
-          )}
-        </OnboardRow>}
+                <button
+                  className="btn btn-primary"
+                  style={{ padding: "5px 12px", fontSize: 12 }}
+                  onClick={async () => {
+                    // Fire ONLY the system prompt. It registers Murmur in the
+                    // Accessibility list and has its own "Open System Settings"
+                    // button. We must NOT also open the pane here — doing both
+                    // strands the dialog behind Settings, forcing the user to
+                    // hit Deny (which records a denial) just to close it.
+                    await promptAccessibility();
+                    refresh();
+                  }}
+                >
+                  Allow accessibility
+                </button>
+                <button
+                  className="btn btn-ghost"
+                  style={{ padding: "2px 8px", fontSize: 11 }}
+                  onClick={() => openPrivacyPane("accessibility")}
+                >
+                  Open Settings manually
+                </button>
+              </div>
+            )}
+          </OnboardRow>
+        )}
 
         {/* Input Monitoring — needed for the fn (globe) push-to-talk key */}
-        {!isLinux && <OnboardRow
-          label="Input Monitoring"
-          hint="Lets you hold the fn (globe) key to dictate. Relaunch Murmur after granting."
-          ok={im}
-        >
-          {!im && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
-              <button
-                className="btn btn-primary"
-                style={{ padding: "5px 12px", fontSize: 12 }}
-                onClick={async () => {
-                  // Fires the system prompt and registers Murmur in the Input
-                  // Monitoring list; its own dialog links to System Settings.
-                  // macOS only prompts while the status is notDetermined — if
-                  // it was previously denied, this is a silent no-op, so the
-                  // manual-Settings fallback below is the escape hatch.
-                  await requestInputMonitoring();
-                  refresh();
+        {!isLinux && (
+          <OnboardRow
+            label="Input Monitoring"
+            hint="Lets you hold the fn (globe) key to dictate. Relaunch Murmur after granting."
+            ok={im}
+          >
+            {!im && (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 6,
+                  alignItems: "flex-end",
                 }}
               >
-                Allow fn key
-              </button>
-              <button
-                className="btn btn-ghost"
-                style={{ padding: "2px 8px", fontSize: 11 }}
-                onClick={() => openPrivacyPane("input-monitoring")}
-              >
-                Open Settings manually
-              </button>
-            </div>
-          )}
-        </OnboardRow>}
+                <button
+                  className="btn btn-primary"
+                  style={{ padding: "5px 12px", fontSize: 12 }}
+                  onClick={async () => {
+                    // Fires the system prompt and registers Murmur in the Input
+                    // Monitoring list; its own dialog links to System Settings.
+                    // macOS only prompts while the status is notDetermined — if
+                    // it was previously denied, this is a silent no-op, so the
+                    // manual-Settings fallback below is the escape hatch.
+                    await requestInputMonitoring();
+                    refresh();
+                  }}
+                >
+                  Allow fn key
+                </button>
+                <button
+                  className="btn btn-ghost"
+                  style={{ padding: "2px 8px", fontSize: 11 }}
+                  onClick={() => openPrivacyPane("input-monitoring")}
+                >
+                  Open Settings manually
+                </button>
+              </div>
+            )}
+          </OnboardRow>
+        )}
 
         {/* Transcription — embedded EngineSettings, no border after */}
         <div style={{ paddingTop: 14 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginBottom: 8,
+            }}
+          >
             {ready ? (
               <span className="status-icon-ok">
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-                  <path d="M2 5l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 10 10"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M2 5l2 2 4-4"
+                    stroke="white"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
               </span>
             ) : (
               <span className="status-icon-pending" />
             )}
-            <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}>
+            <span
+              style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}
+            >
               Transcription
             </span>
           </div>
-          <p style={{ margin: "0 0 12px", fontSize: 12, color: "var(--text-2)", lineHeight: 1.5 }}>
-            Pick how Murmur transcribes — Local and Groq are free; you can change this anytime.
+          <p
+            style={{
+              margin: "0 0 12px",
+              fontSize: 12,
+              color: "var(--text-2)",
+              lineHeight: 1.5,
+            }}
+          >
+            Start locally with no account or API key. Cloud engines are
+            optional. You can change this anytime.
           </p>
           <EngineSettings onChange={refresh} />
         </div>
       </div>
 
+      {mic === "authorized" && ready && !(ax && im) && (
+        <div className="notice">
+          <p>
+            You can start with in-app recording and copy your text. Enable the
+            permissions above when you want shortcuts and automatic pasting.
+          </p>
+          <button className="btn btn-primary" onClick={onReady}>
+            Continue with in-app recording
+          </button>
+        </div>
+      )}
       {/* Restart — permission grants are re-read only at launch, so a relaunch
           is the reliable way to pick up a grant made in System Settings. */}
       <div style={{ marginTop: 16, textAlign: "center", maxWidth: 400 }}>
@@ -209,7 +312,9 @@ export function Onboarding({ onReady }: { onReady: () => void }) {
           Restart Murmur
         </button>
         <p style={{ margin: "6px 0 0", fontSize: 11, color: "var(--text-2)" }}>
-          {isLinux ? "Murmur uses your system’s default microphone. Select it in Omarchy’s audio settings." : "Granted a permission in System Settings but it still shows pending? Restart to apply it."}
+          {isLinux
+            ? "Murmur uses your system’s default microphone. Select it in Omarchy’s audio settings."
+            : "Granted a permission in System Settings but it still shows pending? Restart to apply it."}
         </p>
       </div>
     </div>
@@ -232,23 +337,35 @@ function OnboardRow({
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         {ok ? (
           <span className="status-icon-ok">
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-              <path d="M2 5l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 10 10"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M2 5l2 2 4-4"
+                stroke="white"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
           </span>
         ) : (
           <span className="status-icon-pending" />
         )}
         <div>
-          <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}>{label}</div>
+          <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}>
+            {label}
+          </div>
           {hint && (
             <div style={{ fontSize: 12, color: "var(--text-2)" }}>{hint}</div>
           )}
         </div>
       </div>
-      {children && (
-        <div style={{ flexShrink: 0 }}>{children}</div>
-      )}
+      {children && <div style={{ flexShrink: 0 }}>{children}</div>}
     </div>
   );
 }

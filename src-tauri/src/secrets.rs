@@ -33,7 +33,10 @@ pub fn get(account: &str) -> Result<Option<String>> {
         Err(Error::NoEntry) => None,
         Err(e) => return Err(e),
     };
-    cache().lock().unwrap().insert(account.to_owned(), v.clone());
+    cache()
+        .lock()
+        .unwrap()
+        .insert(account.to_owned(), v.clone());
     Ok(v)
 }
 
@@ -48,16 +51,19 @@ pub fn delete(account: &str) -> Result<()> {
 
 #[tauri::command]
 pub fn secret_set(key: String, value: String) -> std::result::Result<(), String> {
+    validate_key(&key)?;
     set(&key, &value).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub fn secret_get(key: String) -> std::result::Result<Option<String>, String> {
+    validate_key(&key)?;
     get(&key).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub fn secret_delete(key: String) -> std::result::Result<(), String> {
+    validate_key(&key)?;
     delete(&key).map_err(|e| e.to_string())
 }
 
@@ -65,12 +71,23 @@ pub fn secret_delete(key: String) -> std::result::Result<(), String> {
 mod tests {
     use super::*;
     #[test]
-    #[cfg_attr(target_os = "linux", ignore = "Requires an unlocked desktop Secret Service; run with --ignored")]
+    #[cfg_attr(
+        target_os = "linux",
+        ignore = "Requires an unlocked desktop Secret Service; run with --ignored"
+    )]
     fn roundtrip_and_delete() {
         let acct = "test-byok-key";
         set(acct, "sk-secret-123").unwrap();
         assert_eq!(get(acct).unwrap().as_deref(), Some("sk-secret-123"));
         delete(acct).unwrap();
         assert_eq!(get(acct).unwrap(), None);
+    }
+}
+
+fn validate_key(key: &str) -> std::result::Result<(), String> {
+    if matches!(key, "openai_api_key" | "groq_api_key") {
+        Ok(())
+    } else {
+        Err("Unknown provider credential".into())
     }
 }

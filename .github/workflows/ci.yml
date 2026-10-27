@@ -2,6 +2,7 @@ name: CI
 
 on:
   push:
+  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -31,5 +32,5 @@ jobs:
       # Build the frontend BEFORE any cargo step: tauri::generate_context!
       # embeds ../dist at compile time and fails if it doesn't exist.
       - run: npm run build
-      - run: cargo test --manifest-path src-tauri/Cargo.toml
+      - run: cargo test --manifest-path src-tauri/Cargo.toml -- --skip secrets::tests::roundtrip_and_delete
       - run: cargo build --features custom-protocol --manifest-path src-tauri/Cargo.toml

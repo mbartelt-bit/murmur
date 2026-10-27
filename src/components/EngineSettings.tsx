@@ -1,3 +1,4 @@
+import { ChatGptConnection } from "./ChatGptConnection";
 import { useCallback, useEffect, useState } from "react";
 import {
   getEngineSettings,
@@ -29,20 +30,20 @@ interface ProviderInfo {
 const PROVIDER_INFO: Record<"openai" | "groq", ProviderInfo> = {
   groq: {
     keyPage: "https://console.groq.com/keys",
-    costLabel: "Free tier · no card",
-    costTone: "free",
+    costLabel: "Provider billing applies",
+    costTone: "paid",
     steps: [
-      "Sign in with Google or GitHub",
+      "Sign in to your Groq account",
       'Click "Create API Key"',
       "Copy it and paste below",
     ],
   },
   openai: {
     keyPage: "https://platform.openai.com/api-keys",
-    costLabel: "Pay-as-you-go · card required",
+    costLabel: "Separate API billing",
     costTone: "paid",
     steps: [
-      "Add ~$5 credit + a card",
+      "Check your API billing and usage limits",
       'Click "Create new secret key"',
       "Copy it and paste below",
     ],
@@ -54,13 +55,15 @@ const PROVIDER_INFO: Record<"openai" | "groq", ProviderInfo> = {
 const STT_OPTIONS = [
   { value: "local", label: "Local (on-device Whisper)", free: true },
   { value: "openai", label: "OpenAI", free: false },
-  { value: "groq", label: "Groq", free: true },
+  { value: "groq", label: "Groq", free: false },
 ] as const;
 
 const CLEANUP_OPTIONS = [
-  { value: "rule", label: "Rule-based (local, free)", free: true },
+  { value: "verbatim", label: "Verbatim", free: true },
+  { value: "rule", label: "Local", free: true },
+  { value: "chatgpt", label: "ChatGPT", free: false },
   { value: "openai", label: "OpenAI", free: false },
-  { value: "groq", label: "Groq", free: true },
+  { value: "groq", label: "Groq", free: false },
 ] as const;
 
 // Legacy maps kept for compatibility (keys/labels still used in ConnectBlock)
@@ -128,6 +131,7 @@ function FreeDot() {
 }
 
 export function EngineSettings({ onChange }: Props) {
+  const [error, setError] = useState("");
   const [settings, setSettings] = useState<EngineSettingsData | null>(null);
   const [localModelReady, setLocalModelReady] = useState(false);
   const [modelDownloading, setModelDownloading] = useState(false);
@@ -152,25 +156,35 @@ export function EngineSettings({ onChange }: Props) {
   }, []);
 
   useEffect(() => {
-    refresh();
+    refresh().catch((e) => setError(String(e)));
   }, [refresh]);
 
   const handleSttChange = useCallback(
     async (value: string) => {
-      await setSttEngine(value);
-      await refresh();
-      onChange?.();
+      try {
+        await setSttEngine(value);
+        await refresh();
+        onChange?.();
+        setError("");
+      } catch (e) {
+        setError(String(e));
+      }
     },
-    [refresh, onChange]
+    [refresh, onChange],
   );
 
   const handleCleanupChange = useCallback(
     async (value: string) => {
-      await setCleanupEngine(value);
-      await refresh();
-      onChange?.();
+      try {
+        await setCleanupEngine(value);
+        await refresh();
+        onChange?.();
+        setError("");
+      } catch (e) {
+        setError(String(e));
+      }
     },
-    [refresh, onChange]
+    [refresh, onChange],
   );
 
   const setVerifyState = useCallback((provider: string, state: string) => {
@@ -188,7 +202,7 @@ export function EngineSettings({ onChange }: Props) {
         setVerifyState(provider, e instanceof Error ? e.message : String(e));
       }
     },
-    [setVerifyState]
+    [setVerifyState],
   );
 
   const handleSaveKey = useCallback(
@@ -212,38 +226,57 @@ export function EngineSettings({ onChange }: Props) {
         setSavingKey(null);
       }
     },
-    [openaiInput, groqInput, refresh, onChange, handleVerify, setVerifyState]
+    [openaiInput, groqInput, refresh, onChange, handleVerify, setVerifyState],
   );
 
   const handleRemoveKey = useCallback(
     async (provider: "openai" | "groq") => {
       const keyName = PROVIDER_KEY_ACCOUNT[provider];
-      await deleteSecret(keyName);
-      setVerifyState(provider, "idle");
-      await refresh();
-      onChange?.();
+      try {
+        await deleteSecret(keyName);
+        setVerifyState(provider, "idle");
+        await refresh();
+        onChange?.();
+      } catch (e) {
+        setError(String(e));
+      }
     },
-    [refresh, onChange, setVerifyState]
+    [refresh, onChange, setVerifyState],
   );
 
   const handleDownloadModel = useCallback(async () => {
     setModelDownloading(true);
     setModelProgress(0);
-    const unlisten = await onModelProgress((p) => setModelProgress(p));
+    let unlisten: (() => void) | undefined;
+    setError("");
     try {
+      unlisten = await onModelProgress((p) => setModelProgress(p));
       await downloadModel();
       await refresh();
       onChange?.();
+    } catch (e) {
+      setError(
+        `The model could not download. Check your connection and try again. ${String(e)}`,
+      );
     } finally {
-      unlisten();
+      unlisten?.();
       setModelDownloading(false);
     }
   }, [refresh, onChange]);
 
   if (!settings) {
     return (
-      <div style={{ padding: "12px 0", color: "var(--text-2)", fontSize: 13, opacity: 0.6 }}>
-        Loading engine settings…
+      <div
+        style={{
+          padding: "12px 0",
+          color: "var(--text-2)",
+          fontSize: 13,
+          opacity: 0.6,
+        }}
+      >
+        {error
+          ? `Could not load settings: ${error}`
+          : "Loading engine settings…"}
       </div>
     );
   }
@@ -252,22 +285,38 @@ export function EngineSettings({ onChange }: Props) {
   // This is the gap fix: if Local STT + OpenAI cleanup, OpenAI key block still shows.
   const cloudProvidersInUse = Array.from(
     new Set(
-      [settings.stt, settings.cleanup].filter((v) => v === "openai" || v === "groq")
-    )
+      [settings.stt, settings.cleanup].filter(
+        (v) => v === "openai" || v === "groq",
+      ),
+    ),
   ) as ("openai" | "groq")[];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {error && (
+        <p role="alert" className="notice error">
+          {error}
+        </p>
+      )}
       {/* Transcription engine */}
       <section>
         <div className="section-label">Transcription</div>
         {/* Segmented control — radio inputs hidden visually, accessible by role */}
-        <div className="seg" role="radiogroup" aria-label="Transcription engine">
+        <div
+          className="seg"
+          role="radiogroup"
+          aria-label="Transcription engine"
+        >
           {STT_OPTIONS.map((opt) => (
             <label
               key={opt.value}
               className={`seg-item${settings.stt === opt.value ? " is-sel" : ""}`}
-              style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 0 }}
+              style={{
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 0,
+              }}
             >
               <input
                 type="radio"
@@ -275,7 +324,13 @@ export function EngineSettings({ onChange }: Props) {
                 value={opt.value}
                 checked={settings.stt === opt.value}
                 onChange={() => handleSttChange(opt.value)}
-                style={{ position: "absolute", opacity: 0, width: 0, height: 0, margin: 0 }}
+                style={{
+                  position: "absolute",
+                  opacity: 0,
+                  width: 0,
+                  height: 0,
+                  margin: 0,
+                }}
                 aria-checked={settings.stt === opt.value}
               />
               {opt.label}
@@ -285,17 +340,44 @@ export function EngineSettings({ onChange }: Props) {
         </div>
 
         {/* Free-path steering tip */}
-        <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--text-2)", lineHeight: 1.5 }}>
-          Local is free &amp; private. Groq is free in the cloud (no card). OpenAI is paid but most accurate.
+        <p
+          style={{
+            margin: "6px 0 0",
+            fontSize: 12,
+            color: "var(--text-2)",
+            lineHeight: 1.5,
+          }}
+        >
+          Local works offline after download. OpenAI and Groq send audio to
+          their cloud services and use your own API credentials.
         </p>
 
         {/* Local model sub-row */}
         {settings.stt === "local" && (
-          <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+          <div
+            style={{
+              marginTop: 12,
+              display: "flex",
+              flexDirection: "column",
+              gap: 6,
+            }}
+          >
             {localModelReady ? (
               <span className="badge-ok">
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-                  <path d="M2 5l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 10 10"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M2 5l2 2 4-4"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
                 Model ready
               </span>
@@ -304,7 +386,9 @@ export function EngineSettings({ onChange }: Props) {
                 <div className="progress-track" style={{ width: 128 }}>
                   <div
                     className="progress-fill"
-                    style={{ width: `${Math.round((modelProgress ?? 0) * 100)}%` }}
+                    style={{
+                      width: `${Math.round((modelProgress ?? 0) * 100)}%`,
+                    }}
                   />
                 </div>
                 <span style={{ fontSize: 12, color: "var(--text-2)" }}>
@@ -312,7 +396,11 @@ export function EngineSettings({ onChange }: Props) {
                 </span>
               </div>
             ) : (
-              <button className="btn btn-primary" onClick={handleDownloadModel} style={{ alignSelf: "flex-start" }}>
+              <button
+                className="btn btn-primary"
+                onClick={handleDownloadModel}
+                style={{ alignSelf: "flex-start" }}
+              >
                 Download model (~142 MB)
               </button>
             )}
@@ -328,7 +416,12 @@ export function EngineSettings({ onChange }: Props) {
             <label
               key={opt.value}
               className={`seg-item${settings.cleanup === opt.value ? " is-sel" : ""}`}
-              style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 0 }}
+              style={{
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 0,
+              }}
             >
               <input
                 type="radio"
@@ -336,7 +429,13 @@ export function EngineSettings({ onChange }: Props) {
                 value={opt.value}
                 checked={settings.cleanup === opt.value}
                 onChange={() => handleCleanupChange(opt.value)}
-                style={{ position: "absolute", opacity: 0, width: 0, height: 0, margin: 0 }}
+                style={{
+                  position: "absolute",
+                  opacity: 0,
+                  width: 0,
+                  height: 0,
+                  margin: 0,
+                }}
                 aria-checked={settings.cleanup === opt.value}
               />
               {opt.label}
@@ -347,11 +446,17 @@ export function EngineSettings({ onChange }: Props) {
       </section>
 
       {/* Guided Connect blocks — one per in-use cloud provider */}
+      {settings.cleanup === "chatgpt" && (
+        <ChatGptConnection onChange={onChange} />
+      )}
+
       {cloudProvidersInUse.map((provider) => (
         <ConnectBlock
           key={provider}
           provider={provider}
-          keySet={provider === "openai" ? settings.openai_key : settings.groq_key}
+          keySet={
+            provider === "openai" ? settings.openai_key : settings.groq_key
+          }
           input={provider === "openai" ? openaiInput : groqInput}
           onInput={provider === "openai" ? setOpenaiInput : setGroqInput}
           onSave={() => handleSaveKey(provider)}
@@ -394,11 +499,24 @@ function ConnectBlock({
   const info = PROVIDER_INFO[provider];
 
   return (
-    <section className="card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+    <section
+      className="card"
+      style={{ display: "flex", flexDirection: "column", gap: 10 }}
+    >
       {/* Header row */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+          flexWrap: "wrap",
+        }}
+      >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div className="section-label" style={{ marginBottom: 0 }}>Connect {label}</div>
+          <div className="section-label" style={{ marginBottom: 0 }}>
+            Connect {label}
+          </div>
           <CostBadge tone={info.costTone} label={info.costLabel} />
         </div>
         <button
@@ -411,7 +529,15 @@ function ConnectBlock({
       </div>
 
       {/* Provider-specific step hint */}
-      <ol style={{ margin: 0, padding: "0 0 0 16px", fontSize: 12, color: "var(--text-2)", lineHeight: 1.6 }}>
+      <ol
+        style={{
+          margin: 0,
+          padding: "0 0 0 16px",
+          fontSize: 12,
+          color: "var(--text-2)",
+          lineHeight: 1.6,
+        }}
+      >
         {info.steps.map((step, i) => (
           <li key={i}>{step}</li>
         ))}
@@ -419,10 +545,29 @@ function ConnectBlock({
 
       {/* Key input or saved state */}
       {keySet ? (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            flexWrap: "wrap",
+          }}
+        >
           <span className="badge-ok">
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-              <path d="M2 5l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 10 10"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M2 5l2 2 4-4"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
             Key saved
           </span>
@@ -448,6 +593,7 @@ function ConnectBlock({
             type="password"
             value={input}
             onChange={(e) => onInput(e.target.value)}
+            aria-label={`${label} API key`}
             placeholder={`${label} API key`}
             className="input"
             style={{ fontFamily: "monospace", maxWidth: 220 }}
@@ -464,19 +610,37 @@ function ConnectBlock({
 
       {/* Verify status line */}
       {verifyState === "verifying" && (
-        <p style={{ margin: 0, fontSize: 12, color: "var(--text-2)" }}>Verifying…</p>
+        <p style={{ margin: 0, fontSize: 12, color: "var(--text-2)" }}>
+          Verifying…
+        </p>
       )}
       {verifyState === "ok" && (
         <span className="badge-ok" style={{ alignSelf: "flex-start" }}>
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <path d="M2 5l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <svg
+            width="10"
+            height="10"
+            viewBox="0 0 10 10"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M2 5l2 2 4-4"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
           Connected
         </span>
       )}
-      {verifyState !== "idle" && verifyState !== "verifying" && verifyState !== "ok" && (
-        <p style={{ margin: 0, fontSize: 12, color: "var(--danger)" }}>{verifyState}</p>
-      )}
+      {verifyState !== "idle" &&
+        verifyState !== "verifying" &&
+        verifyState !== "ok" && (
+          <p style={{ margin: 0, fontSize: 12, color: "var(--danger)" }}>
+            {verifyState}
+          </p>
+        )}
     </section>
   );
 }
