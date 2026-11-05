@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   micStatus,
   requestMic,
@@ -20,21 +20,26 @@ export function Onboarding({ onReady }: { onReady: () => void }) {
   const [im, setIm] = useState<boolean>(false);
   const [ready, setReady] = useState<boolean>(false);
 
+  const checking = useRef(false);
   const refresh = useCallback(async () => {
+    if (checking.current) return;
+    checking.current = true;
     try {
-      const [m, a, i, r] = await Promise.all([
+      const [m, a, i] = await Promise.all([
         micStatus(),
         accessibilityTrusted(),
         inputMonitoringTrusted(),
-        sttReady(),
       ]);
       setMic(m);
       setAx(a);
       setIm(i);
+      const r = await sttReady();
       setReady(r);
       if (m === "authorized" && a && i && r) onReady();
     } catch {
       setError("Could not check setup. Restart Murmur to try again.");
+    } finally {
+      checking.current = false;
     }
   }, [onReady]);
 

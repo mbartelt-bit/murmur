@@ -50,9 +50,11 @@ pub fn delete(account: &str) -> Result<()> {
 }
 
 #[tauri::command]
-pub fn secret_set(key: String, value: String) -> std::result::Result<(), String> {
+pub async fn secret_set(key: String, value: String) -> std::result::Result<(), String> {
     validate_key(&key)?;
-    set(&key, &value).map_err(|e| e.to_string())
+    tauri::async_runtime::spawn_blocking(move || set(&key, &value).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -62,9 +64,11 @@ pub fn secret_get(key: String) -> std::result::Result<Option<String>, String> {
 }
 
 #[tauri::command]
-pub fn secret_delete(key: String) -> std::result::Result<(), String> {
+pub async fn secret_delete(key: String) -> std::result::Result<(), String> {
     validate_key(&key)?;
-    delete(&key).map_err(|e| e.to_string())
+    tauri::async_runtime::spawn_blocking(move || delete(&key).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[cfg(test)]

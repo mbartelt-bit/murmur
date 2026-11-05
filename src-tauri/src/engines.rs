@@ -15,7 +15,13 @@ pub struct EngineSettings {
 
 /// Return current engine selections + whether each cloud provider's key is set.
 #[tauri::command]
-pub fn get_engine_settings(app: AppHandle) -> EngineSettings {
+pub async fn get_engine_settings(app: AppHandle) -> Result<EngineSettings, String> {
+    tauri::async_runtime::spawn_blocking(move || engine_settings_inner(app))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+fn engine_settings_inner(app: AppHandle) -> EngineSettings {
     let store = app.store("settings.json").ok();
 
     let stt = store
@@ -70,7 +76,13 @@ pub fn set_cleanup_engine(app: AppHandle, value: String) -> Result<(), String> {
 /// - Cloud (openai/groq): API key is present and non-empty in Keychain.
 /// - Local: model file exists and is >1 MB.
 #[tauri::command]
-pub fn stt_ready(app: AppHandle) -> bool {
+pub async fn stt_ready(app: AppHandle) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || stt_ready_inner(app))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+fn stt_ready_inner(app: AppHandle) -> bool {
     let stored = app
         .store("settings.json")
         .ok()
@@ -98,7 +110,13 @@ fn key_present(account: &str) -> bool {
 /// Ping the provider's /models endpoint with the stored API key.
 /// Returns `Ok("Connected")` on HTTP 200, or `Err` with a user-facing message.
 #[tauri::command]
-pub fn verify_provider(provider: String) -> Result<String, String> {
+pub async fn verify_provider(provider: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || verify_provider_inner(provider))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn verify_provider_inner(provider: String) -> Result<String, String> {
     let p = crate::provider::Provider::from_id(&provider)
         .ok_or_else(|| "Unknown provider.".to_owned())?;
 
