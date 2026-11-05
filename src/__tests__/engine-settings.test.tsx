@@ -30,7 +30,8 @@ describe("EngineSettings", () => {
     invoke.mockReset();
     // Default: return current settings + model not ready
     invoke.mockImplementation((cmd: string) => {
-      if (cmd === "get_engine_settings") return Promise.resolve(defaultSettings);
+      if (cmd === "get_engine_settings")
+        return Promise.resolve(defaultSettings);
       if (cmd === "model_ready") return Promise.resolve(false);
       return Promise.resolve(undefined);
     });
@@ -41,15 +42,17 @@ describe("EngineSettings", () => {
 
     // Wait for settings to load
     await waitFor(() =>
-      expect(screen.queryByText(/loading engine settings/i)).toBeNull()
+      expect(screen.queryByText(/loading engine settings/i)).toBeNull(),
     );
 
     // Local (on-device Whisper) radio should be checked for STT
-    const localRadio = screen.getByRole("radio", { name: /local \(on-device whisper\)/i });
+    const localRadio = screen.getByRole("radio", {
+      name: /local \(on-device whisper\)/i,
+    });
     expect((localRadio as HTMLInputElement).checked).toBe(true);
 
     // Rule-based radio should be checked for cleanup
-    const ruleRadio = screen.getByRole("radio", { name: /rule-based/i });
+    const ruleRadio = screen.getByRole("radio", { name: /^Local$/i });
     expect((ruleRadio as HTMLInputElement).checked).toBe(true);
   });
 
@@ -71,14 +74,14 @@ describe("EngineSettings", () => {
 
     render(<EngineSettings />);
     await waitFor(() =>
-      expect(screen.queryByText(/loading engine settings/i)).toBeNull()
+      expect(screen.queryByText(/loading engine settings/i)).toBeNull(),
     );
 
     const openaiRadio = screen.getAllByRole("radio", { name: /openai/i })[0];
     fireEvent.click(openaiRadio);
 
     await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith("set_stt_engine", "openai")
+      expect(invoke).toHaveBeenCalledWith("set_stt_engine", "openai"),
     );
   });
 
@@ -100,7 +103,7 @@ describe("EngineSettings", () => {
 
     render(<EngineSettings />);
     await waitFor(() =>
-      expect(screen.queryByText(/loading engine settings/i)).toBeNull()
+      expect(screen.queryByText(/loading engine settings/i)).toBeNull(),
     );
 
     // With stt=openai, the key input should appear
@@ -112,12 +115,16 @@ describe("EngineSettings", () => {
     fireEvent.click(connectBtn);
 
     await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith("secret_set", "openai_api_key", "sk-test-key-123")
+      expect(invoke).toHaveBeenCalledWith(
+        "secret_set",
+        "openai_api_key",
+        "sk-test-key-123",
+      ),
     );
 
     // Auto-verify fires after save
     await waitFor(() =>
-      expect(invoke).toHaveBeenCalledWith("verify_provider", "openai")
+      expect(invoke).toHaveBeenCalledWith("verify_provider", "openai"),
     );
   });
 });

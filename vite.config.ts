@@ -34,10 +34,14 @@ export default defineConfig(async () => ({
   },
   build: {
     rollupOptions: {
-      input: { main: resolve(__dirname, "index.html"), hud: resolve(__dirname, "hud.html") },
+      input: {
+        main: resolve(__dirname, "index.html"),
+        hud: resolve(__dirname, "hud.html"),
+      },
     },
   },
   test: {
+    include: ["src/**/*.test.{ts,tsx}"],
     environment: "jsdom",
     globals: true,
   },

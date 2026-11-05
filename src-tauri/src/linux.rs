@@ -1,11 +1,17 @@
 //! Hyprland sends explicit recording edges; no global keyboard monitoring is needed.
-use crate::hotkey::{DoubleTap, PressAction, PttSink, ReleaseAction};
-use std::{io, os::unix::{fs::PermissionsExt, net::UnixDatagram}, path::PathBuf, sync::Arc};
-use tauri::{AppHandle, Emitter};
+use crate::hotkey::{KeyEdges, PttSink};
+use std::{
+    io,
+    os::unix::{fs::PermissionsExt, net::UnixDatagram},
+    path::PathBuf,
+    sync::Arc,
+};
+use tauri::AppHandle;
 
 fn socket_path() -> io::Result<PathBuf> {
-    let runtime = std::env::var_os("XDG_RUNTIME_DIR")
-        .ok_or_else(|| io::Error::other("XDG_RUNTIME_DIR is not set; launch from your desktop session"))?;
+    let runtime = std::env::var_os("XDG_RUNTIME_DIR").ok_or_else(|| {
+        io::Error::other("XDG_RUNTIME_DIR is not set; launch from your desktop session")
+    })?;
     Ok(PathBuf::from(runtime).join("murmur.sock"))
 }
 
@@ -20,7 +26,9 @@ pub fn prepare() -> io::Result<Option<UnixDatagram>> {
         Some("--status") => "ping",
         Some("--check-install") => {
             if !cfg!(feature = "custom-protocol") {
-                return Err(io::Error::other("Rebuild with --features custom-protocol to embed the interface"));
+                return Err(io::Error::other(
+                    "Rebuild with --features custom-protocol to embed the interface",
+                ));
             }
             return Ok(None);
         }
@@ -34,15 +42,21 @@ pub fn prepare() -> io::Result<Option<UnixDatagram>> {
     let client = UnixDatagram::unbound()?;
     match client.send_to(command.as_bytes(), &path) {
         Ok(_) => return Ok(None),
-        Err(e) if matches!(e.kind(), io::ErrorKind::NotFound | io::ErrorKind::ConnectionRefused) => {}
+        Err(e)
+            if matches!(
+                e.kind(),
+                io::ErrorKind::NotFound | io::ErrorKind::ConnectionRefused
+            ) => {}
         Err(e) => return Err(e),
     }
     if matches!(command, "press" | "release") || arg.as_deref() == Some("--status") {
-        return Err(io::Error::other("Murmur is not running. Open Murmur first."));
+        return Err(io::Error::other(
+            "Murmur is not running. Open Murmur first.",
+        ));
     }
     match std::fs::remove_file(&path) {
-        Ok(()) => {},
-        Err(e) if e.kind() == io::ErrorKind::NotFound => {},
+        Ok(()) => {}
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {}
         Err(e) => return Err(e),
     }
     let socket = UnixDatagram::bind(&path)?;
@@ -52,23 +66,16 @@ pub fn prepare() -> io::Result<Option<UnixDatagram>> {
 
 #[derive(Default)]
 struct Edges {
-    pressed: bool,
-    tap: DoubleTap,
+    keys: KeyEdges,
 }
-
 impl Edges {
-    fn update(&mut self, command: &str, now: u64) -> Option<bool> {
-        match command {
-            "press" if !self.pressed => {
-                self.pressed = true;
-                Some(!matches!(self.tap.on_press(now), PressAction::ToggleOff))
-            }
-            "release" if self.pressed => {
-                self.pressed = false;
-                (self.tap.on_release(now) == ReleaseAction::Stop).then_some(false)
-            }
-            _ => None,
-        }
+    fn update(&mut self, command: &str, _now: u64) -> Option<bool> {
+        let pressed = match command {
+            "press" => true,
+            "release" => false,
+            _ => return None,
+        };
+        self.keys.update(pressed).then_some(pressed)
     }
 }
 
@@ -78,7 +85,9 @@ pub fn listen(app: AppHandle, socket: UnixDatagram, sink: Arc<dyn PttSink>) {
         let clock = std::time::Instant::now();
         let mut bytes = [0u8; 32];
         while let Ok(n) = socket.recv(&mut bytes) {
-            let Ok(command) = std::str::from_utf8(&bytes[..n]) else { continue };
+            let Ok(command) = std::str::from_utf8(&bytes[..n]) else {
+                continue;
+            };
             if command == "settings" {
                 let app2 = app.clone();
                 let _ = app.run_on_main_thread(move || crate::windows::show_settings(&app2));
@@ -86,8 +95,11 @@ pub fn listen(app: AppHandle, socket: UnixDatagram, sink: Arc<dyn PttSink>) {
                 let app2 = app.clone();
                 let sink = sink.clone();
                 let _ = app.run_on_main_thread(move || {
-                    if start {
-                        let _ = app2.emit("hud-state", "recording");
+                    if crate::hotkey::toggle_mode(&app2) {
+                        if start {
+                            sink.toggle(&app2);
+                        }
+                    } else if start {
                         sink.start(&app2);
                     } else {
                         sink.stop(&app2);
@@ -111,12 +123,12 @@ mod tests {
         assert_eq!(e.update("release", 901), None);
     }
     #[test]
-    fn double_tap_latches_until_next_press() {
+    fn quick_repeated_holds_remain_explicit_edges() {
         let mut e = Edges::default();
         assert_eq!(e.update("press", 100), Some(true));
         assert_eq!(e.update("release", 150), Some(false));
         assert_eq!(e.update("press", 200), Some(true));
-        assert_eq!(e.update("release", 250), None);
-        assert_eq!(e.update("press", 3000), Some(false));
+        assert_eq!(e.update("release", 250), Some(false));
+        assert_eq!(e.update("press", 3000), Some(true));
     }
 }

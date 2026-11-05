@@ -7,10 +7,19 @@ export function getDb(): Promise<Database> {
 }
 
 export interface Transcript {
-  id: number; raw_text: string; clean_text: string; app_name: string | null; created_at: string;
+  corrected_text?: string | null;
+  id: number;
+  raw_text: string;
+  clean_text: string;
+  app_name: string | null;
+  created_at: string;
 }
 
-export async function insertTranscript(raw: string, clean: string, app: string | null) {
+export async function insertTranscript(
+  raw: string,
+  clean: string,
+  app: string | null,
+) {
   const db = await getDb();
   await db.execute(
     "INSERT INTO transcripts (raw_text, clean_text, app_name) VALUES ($1, $2, $3)",
@@ -21,11 +30,20 @@ export async function insertTranscript(raw: string, clean: string, app: string |
 export async function listTranscripts(limit = 50): Promise<Transcript[]> {
   const db = await getDb();
   return db.select<Transcript[]>(
-    "SELECT * FROM transcripts ORDER BY id DESC LIMIT $1", [limit],
+    "SELECT * FROM transcripts ORDER BY id DESC LIMIT $1",
+    [limit],
   );
 }
 
 export async function deleteTranscript(id: number) {
   const db = await getDb();
   await db.execute("DELETE FROM transcripts WHERE id = $1", [id]);
+}
+
+export async function correctTranscript(id: number, text: string | null) {
+  const db = await getDb();
+  await db.execute("UPDATE transcripts SET corrected_text = $1 WHERE id = $2", [
+    text,
+    id,
+  ]);
 }

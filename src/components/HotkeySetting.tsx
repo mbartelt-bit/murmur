@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { getHotkey, setHotkey, inputMonitoringTrusted, openPrivacyPane } from "../lib/ipc";
+import {
+  getHotkey,
+  setHotkey,
+  inputMonitoringTrusted,
+  openPrivacyPane,
+} from "../lib/ipc";
 
 // ── Accelerator helpers ───────────────────────────────────────────────────────
 
@@ -18,7 +23,16 @@ export function formatAccelerator(accel: string): string {
     parts.includes("command");
 
   // The key is the last non-modifier token.
-  const modTokens = new Set(["control", "ctrl", "alt", "option", "shift", "super", "cmd", "command"]);
+  const modTokens = new Set([
+    "control",
+    "ctrl",
+    "alt",
+    "option",
+    "shift",
+    "super",
+    "cmd",
+    "command",
+  ]);
   const keyToken = parts.find((p) => !modTokens.has(p)) ?? "";
 
   const keyLabel = formatKeyToken(keyToken);
@@ -80,10 +94,14 @@ export function buildAccelerator(e: KeyEventLike): string | null {
 }
 
 const PURE_MODIFIER_CODES = new Set([
-  "ControlLeft", "ControlRight",
-  "AltLeft", "AltRight",
-  "ShiftLeft", "ShiftRight",
-  "MetaLeft", "MetaRight",
+  "ControlLeft",
+  "ControlRight",
+  "AltLeft",
+  "AltRight",
+  "ShiftLeft",
+  "ShiftRight",
+  "MetaLeft",
+  "MetaRight",
 ]);
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -94,12 +112,22 @@ export function HotkeySetting() {
 }
 
 function LinuxHotkeySetting() {
-  return <div>
-    <div className="section-label">Push to talk</div>
-    <p>Hold <kbd className="kbd">Ctrl+Alt+D</kbd>, speak, then release to paste.</p>
-    <p style={{ fontSize: 12, color: "var(--text-2)" }}>Double-tap to keep recording; press again to finish. Keep the destination text field focused. Close this window to keep Murmur running in the tray.</p>
-    <p style={{ fontSize: 12, color: "var(--text-2)" }}>Change this shortcut in your Omarchy keyboard configuration.</p>
-  </div>;
+  return (
+    <div>
+      <div className="section-label">Push to talk</div>
+      <p>
+        Hold <kbd className="kbd">Ctrl+Alt+D</kbd>, speak, then release to
+        paste.
+      </p>
+      <p style={{ fontSize: 12, color: "var(--text-2)" }}>
+        Choose Hold or Press once below. Keep the destination text field
+        focused. Close this window to keep Murmur running in the tray.
+      </p>
+      <p style={{ fontSize: 12, color: "var(--text-2)" }}>
+        Change this shortcut in your Omarchy keyboard configuration.
+      </p>
+    </div>
+  );
 }
 
 function DesktopHotkeySetting() {
@@ -136,7 +164,13 @@ function DesktopHotkeySetting() {
       if (PURE_MODIFIER_CODES.has(e.code)) return;
 
       // Esc cancels capture.
-      if (e.code === "Escape" && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
+      if (
+        e.code === "Escape" &&
+        !e.ctrlKey &&
+        !e.altKey &&
+        !e.shiftKey &&
+        !e.metaKey
+      ) {
         setCapturing(false);
         setErrorMsg(null);
         return;
@@ -158,8 +192,8 @@ function DesktopHotkeySetting() {
           typeof err === "string"
             ? err
             : err instanceof Error
-            ? err.message
-            : "Failed to set shortcut.";
+              ? err.message
+              : "Failed to set shortcut.";
         setErrorMsg(msg);
         // Stay in capture mode so the user can try another combo.
       }
@@ -183,15 +217,26 @@ function DesktopHotkeySetting() {
       {/* Primary trigger: the fn (globe) key — always on, handled by the
           event-tap listener. It can't be "recorded" like a combo, so it gets
           its own row instead of living in the capture box below. */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+        }}
+      >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span>
             Hold <kbd className="kbd">🌐 fn</kbd> and speak
           </span>
           {fnReady ? (
-            <span className="badge-ok" style={{ fontSize: 11 }}>Active</span>
+            <span className="badge-ok" style={{ fontSize: 11 }}>
+              Active
+            </span>
           ) : (
-            <span style={{ fontSize: 11, color: "var(--danger)" }}>Needs Input Monitoring</span>
+            <span style={{ fontSize: 11, color: "var(--danger)" }}>
+              Needs Input Monitoring
+            </span>
           )}
         </div>
         {!fnReady && (
@@ -204,18 +249,40 @@ function DesktopHotkeySetting() {
           </button>
         )}
       </div>
-      <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--text-2)", lineHeight: 1.5 }}>
+      <p
+        style={{
+          margin: "6px 0 0",
+          fontSize: 12,
+          color: "var(--text-2)",
+          lineHeight: 1.5,
+        }}
+      >
         No setup needed — just hold the fn (🌐) key. If it pops the emoji or
-        input-source menu, set <em>System Settings → Keyboard → “Press 🌐 key
-        to” → Do Nothing</em>.
+        input-source menu, set{" "}
+        <em>System Settings → Keyboard → “Press 🌐 key to” → Do Nothing</em>.
       </p>
 
       {/* Alternative trigger: a keyboard combo. */}
-      <div className="section-label" style={{ marginTop: 18 }}>Or a keyboard shortcut</div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+      <div className="section-label" style={{ marginTop: 18 }}>
+        Or a keyboard shortcut
+      </div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+        }}
+      >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {capturing ? (
-            <span style={{ fontSize: 13, color: "var(--text-2)", fontStyle: "italic" }}>
+            <span
+              style={{
+                fontSize: 13,
+                color: "var(--text-2)",
+                fontStyle: "italic",
+              }}
+            >
               Press a key combo… (Esc to cancel)
             </span>
           ) : (
@@ -224,7 +291,9 @@ function DesktopHotkeySetting() {
             <kbd className="kbd">{displayLabel}</kbd>
           )}
           {errorMsg && (
-            <span style={{ fontSize: 12, color: "var(--danger)" }}>{errorMsg}</span>
+            <span style={{ fontSize: 12, color: "var(--danger)" }}>
+              {errorMsg}
+            </span>
           )}
         </div>
         {!capturing && (
@@ -240,9 +309,16 @@ function DesktopHotkeySetting() {
           </button>
         )}
       </div>
-      <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--text-2)", lineHeight: 1.5 }}>
-        Must include a modifier (⌃⌥⇧⌘). Bare keys like fn can’t be recorded
-        here — use the fn key above for a no-modifier trigger.
+      <p
+        style={{
+          margin: "6px 0 0",
+          fontSize: 12,
+          color: "var(--text-2)",
+          lineHeight: 1.5,
+        }}
+      >
+        Must include a modifier (⌃⌥⇧⌘). Bare keys like fn can’t be recorded here
+        — use the fn key above for a no-modifier trigger.
       </p>
     </div>
   );

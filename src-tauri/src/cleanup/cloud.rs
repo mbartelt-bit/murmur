@@ -12,6 +12,7 @@ pub struct CloudCleanup {
     base_url: String,
     model: String,
     api_key: Zeroizing<String>,
+    app: Option<tauri::AppHandle>,
 }
 
 impl CloudCleanup {
@@ -24,7 +25,13 @@ impl CloudCleanup {
             base_url: base_url.into(),
             model: model.into(),
             api_key: Zeroizing::new(api_key.into()),
+            app: None,
         }
+    }
+
+    pub fn with_app(mut self, app: tauri::AppHandle) -> Self {
+        self.app = Some(app);
+        self
     }
 
     fn try_clean(&self, raw: &str) -> anyhow::Result<String> {
@@ -38,7 +45,14 @@ impl CloudCleanup {
         });
 
         let url = format!("{}/chat/completions", self.base_url);
-        let client = reqwest::blocking::Client::new();
+        static CLIENT: std::sync::OnceLock<reqwest::blocking::Client> = std::sync::OnceLock::new();
+        let client = CLIENT.get_or_init(|| {
+            reqwest::blocking::Client::builder()
+                .connect_timeout(std::time::Duration::from_secs(10))
+                .timeout(std::time::Duration::from_secs(30))
+                .build()
+                .expect("valid HTTP client configuration")
+        });
         let response = client
             .post(&url)
             .bearer_auth(self.api_key.as_str())
@@ -66,7 +80,16 @@ impl CleanupEngine for CloudCleanup {
         }
         match self.try_clean(raw) {
             Ok(cleaned) if !cleaned.is_empty() => cleaned,
-            _ => super::rules::RuleCleanup.clean(raw),
+            _ => {
+                use tauri::Emitter;
+                if let Some(app) = &self.app {
+                    let _ = app.emit(
+                        "dictation-error",
+                        "Cloud cleanup was unavailable. Your original transcription was kept.",
+                    );
+                }
+                raw.to_owned()
+            }
         }
     }
 }

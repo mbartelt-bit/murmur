@@ -1,0 +1,53 @@
+import '@testing-library/jest-dom/vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { initialState } from './domain';
+const mocks = vi.hoisted(() => ({ load: vi.fn(), persist: vi.fn(), start: vi.fn(), stop: vi.fn(), cancel: vi.fn(), callbacks: new Map<string, (e: any) => void>() }));
+vi.mock('./storage', () => ({ loadState: mocks.load, persistState: mocks.persist }));
+vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => true } }));
+vi.mock('./speech', () => ({ Speech: { available: async () => ({ available: true }), start: mocks.start, stop: mocks.stop, cancel: mocks.cancel, addListener: async (name: string, callback: (e: any) => void) => { mocks.callbacks.set(name, callback); return { remove: async () => {} }; } } }));
+vi.mock('@capacitor/clipboard', () => ({ Clipboard: { write: vi.fn().mockResolvedValue(undefined) } }));
+vi.mock('@capacitor/share', () => ({ Share: { share: vi.fn().mockResolvedValue(undefined) } }));
+import App from './App';
+beforeEach(() => { const state = initialState(); state.onboarded = true; mocks.load.mockResolvedValue(state); mocks.persist.mockResolvedValue(undefined); mocks.start.mockResolvedValue(undefined); mocks.stop.mockResolvedValue(undefined); mocks.cancel.mockResolvedValue(undefined); mocks.callbacks.clear(); });
+afterEach(() => { cleanup(); vi.clearAllMocks(); });
+describe('mobile dictation', () => {
+  it('preserves a draft before recording and ignores late results after cancellation', async () => {
+    render(<App/>);
+    const start = await screen.findByRole('button', { name: 'Start dictation' });
+    await waitFor(() => expect(start).toBeEnabled());
+    fireEvent.change(screen.getByRole('textbox', { name: 'Review and edit your dictation' }), { target: { value: 'Keep this thought' } });
+    fireEvent.click(start);
+    await waitFor(() => expect(mocks.start).toHaveBeenCalled());
+    const id = mocks.start.mock.calls[0][0].sessionId;
+    act(() => mocks.callbacks.get('result')!({ sessionId: id, text: 'A new thought', final: false }));
+    expect(screen.getByRole('textbox')).toHaveValue('A new thought');
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel recording' }));
+    act(() => mocks.callbacks.get('result')!({ sessionId: id, text: 'Stale result', final: true }));
+    expect(screen.getByRole('textbox')).toHaveValue('A new thought');
+    fireEvent.click(screen.getByRole('button', { name: 'Library' }));
+    expect(screen.getByText('Keep this thought')).toBeInTheDocument();
+  });
+  it('keeps a finalized transcript editable and saves user corrections', async () => {
+    render(<App/>); const start = await screen.findByRole('button', { name: 'Start dictation' });
+    await waitFor(() => expect(start).toBeEnabled()); fireEvent.click(start);
+    await waitFor(() => expect(mocks.start).toHaveBeenCalled()); const id = mocks.start.mock.calls[0][0].sessionId;
+    act(() => mocks.callbacks.get('result')!({ sessionId: id, text: 'Meet Mark', final: true }));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Meet Marc' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Remember “Marc”' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Vocabulary' }));
+    expect(screen.getByText('Marc')).toBeInTheDocument();
+    expect(mocks.persist.mock.calls.at(-1)![0].history[0]).toMatchObject({ raw: 'Meet Mark', text: 'Meet Marc' });
+  });
+  it('does not reset unreadable storage and surfaces write failure', async () => {
+    mocks.load.mockRejectedValueOnce(new Error('bad data')); render(<App/>);
+    expect(await screen.findByRole('alert')).toHaveTextContent('not been overwritten'); expect(mocks.persist).not.toHaveBeenCalled();
+    cleanup(); mocks.persist.mockRejectedValueOnce(new Error('full')); render(<App/>);
+    fireEvent.change(await screen.findByRole('textbox'), { target: { value: 'Do not lose me' } });
+    expect(await screen.findByRole('alert')).toHaveTextContent('could not be saved');
+    expect(screen.getByRole('textbox')).toHaveValue('Do not lose me');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry saving' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Retry saving' })).not.toBeInTheDocument());
+  });
+});

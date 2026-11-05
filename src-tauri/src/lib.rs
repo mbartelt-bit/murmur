@@ -1,10 +1,14 @@
 mod audio;
+mod chatgpt;
 mod cleanup;
 mod engines;
 mod hotkey;
 mod insert;
+#[cfg(target_os = "linux")]
+mod linux;
 mod model;
 mod permissions;
+mod personalization;
 mod pipeline;
 mod provider;
 mod ptt_key;
@@ -13,8 +17,6 @@ mod secrets;
 mod stt;
 mod wav;
 mod windows;
-#[cfg(target_os = "linux")]
-mod linux;
 
 use tauri::{
     menu::{Menu, MenuItem},
@@ -38,12 +40,16 @@ pub fn run() {
     let socket = match linux::prepare() {
         Ok(Some(socket)) => socket,
         Ok(None) => return,
-        Err(e) => { eprintln!("Murmur: {e}"); std::process::exit(1); }
+        Err(e) => {
+            eprintln!("Murmur: {e}");
+            std::process::exit(1);
+        }
     };
-    let migrations = vec![Migration {
-        version: 1,
-        description: "create_core_tables",
-        sql: "
+    let migrations = vec![
+        Migration {
+            version: 1,
+            description: "create_core_tables",
+            sql: "
             CREATE TABLE transcripts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 raw_text TEXT NOT NULL,
@@ -57,12 +63,26 @@ pub fn run() {
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
         ",
-        kind: MigrationKind::Up,
-    }];
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 2,
+            description: "transcript_corrections",
+            sql: "ALTER TABLE transcripts ADD COLUMN corrected_text TEXT;",
+            kind: MigrationKind::Up,
+        },
+    ];
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _, _| {
+            windows::show_settings(app);
+        }))
         .plugin(tauri_plugin_clipboard_manager::init())
-        .plugin(SqlBuilder::default().add_migrations("sqlite:murmur.db", migrations).build())
+        .plugin(
+            SqlBuilder::default()
+                .add_migrations("sqlite:murmur.db", migrations)
+                .build(),
+        )
         .plugin(tauri_plugin_store::Builder::new().build())
         .setup(move |app| {
             #[cfg(target_os = "macos")]
@@ -122,6 +142,7 @@ pub fn run() {
                 let _ = std::fs::write(dir.join("diag.log"), diag);
             }
 
+            app.manage(stt::LocalCache::default());
             let _pipeline = pipeline::init(app.handle());
             #[cfg(target_os = "linux")]
             linux::listen(app.handle().clone(), socket, _pipeline);
@@ -129,7 +150,6 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             secrets::secret_set,
-            secrets::secret_get,
             secrets::secret_delete,
             permissions::mic_status,
             permissions::request_mic,
@@ -139,8 +159,16 @@ pub fn run() {
             permissions::request_input_monitoring,
             permissions::open_privacy_pane,
             permissions::open_url,
+            personalization::get_vocabulary,
+            personalization::set_learning,
+            personalization::add_word,
+            personalization::remove_word,
+            personalization::reset_vocabulary,
+            personalization::learn_correction,
             model::model_ready,
             model::download_model,
+            hotkey::get_recording_mode,
+            hotkey::set_recording_mode,
             hotkey::get_hotkey,
             hotkey::set_hotkey,
             engines::get_engine_settings,
@@ -148,8 +176,27 @@ pub fn run() {
             engines::set_cleanup_engine,
             engines::stt_ready,
             engines::verify_provider,
+            chatgpt::chatgpt_status,
+            chatgpt::chatgpt_sign_in,
+            chatgpt::chatgpt_cancel_sign_in,
+            chatgpt::chatgpt_models,
+            chatgpt::chatgpt_select_account,
+            chatgpt::chatgpt_select_model,
+            chatgpt::chatgpt_sign_out,
+            pipeline::recording_state,
+            pipeline::start_recording,
+            pipeline::stop_recording,
+            pipeline::cancel_recording,
             windows::restart_app,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running Murmur");
+        .build(tauri::generate_context!())
+        .expect("error while building Murmur")
+        .run(|app, event| {
+            // Release Metal resources before the native runtime's exit teardown.
+            if matches!(event, tauri::RunEvent::Exit) {
+                if let Some(cache) = app.try_state::<stt::LocalCache>() {
+                    cache.clear();
+                }
+            }
+        });
 }
